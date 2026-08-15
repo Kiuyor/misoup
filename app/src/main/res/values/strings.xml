@@ -5,4 +5,33 @@
     <string name="tab_library">错题库</string>
     <string name="tab_review">复习</string>
     <string name="tab_mine">我的</string>
+
+    <!-- 复习（模块 03） -->
+    <string name="review_today_banner">今日待复习 %1$d 题</string>
+    <string name="review_today_banner_done">今日待复习 0 题，休息一下吧</string>
+    <string name="review_start">开始复习</string>
+    <string name="review_queue_empty">今日队列已清空，按遗忘曲线安排复习</string>
+    <string name="review_stats_total">错题总数</string>
+    <string name="review_stats_review_rate">复习率</string>
+    <string name="review_stats_accuracy">正确率</string>
+    <string name="review_stats_trend">近 30 天复习</string>
+    <string name="review_stats_subject">科目分布</string>
+    <string name="review_stats_mastery">知识点掌握度</string>
+    <string name="review_stats_expand">展开详情</string>
+    <string name="review_stats_collapse">收起</string>
+    <string name="review_stats_mastery_none">暂无知识点数据</string>
+    <string name="review_redo_show_answer">显示答案</string>
+    <string name="review_redo_question">题干</string>
+    <string name="review_redo_answer">答案</string>
+    <string name="review_redo_explanation">解析</string>
+    <string name="review_redo_grade_again">Again\n忘了</string>
+    <string name="review_redo_grade_hard">Hard\n勉强</string>
+    <string name="review_redo_grade_good">Good\n记得</string>
+    <string name="review_redo_grade_easy">Easy\n简单</string>
+    <string name="review_redo_long_press_hint">长按图片可框选答案区</string>
+    <string name="review_redo_selecting_hint">拖动框选答案区域，松手保存</string>
+    <string name="review_redo_cancel_select">取消</string>
+    <string name="review_redo_done">今日复习完成 🎉</string>
+    <string name="review_redo_back">返回</string>
+    <string name="home_review_badge">今日待复习 %1$d</string>
 </resources>

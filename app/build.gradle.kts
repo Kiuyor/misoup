@@ -66,9 +66,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
     implementation(libs.androidx.security.crypto)
+    // 图像预处理链（模块 01）：OpenCV 用于矫正/画质增强（JNI 在真机/模拟器加载）
+    implementation(libs.opencv)
 
-    // 识别相关：本模块仅声明版本（见 gradle/libs.versions.toml），不实现不依赖；
-    // opencv/onnxruntime-android 由模块 04/05 引入，避免骨架 APK 体积膨胀
+    // 识别相关：onnxruntime-android 由模块 05 引入，避免骨架 APK 体积膨胀
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 

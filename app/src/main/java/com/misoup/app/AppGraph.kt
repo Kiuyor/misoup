@@ -27,6 +27,10 @@ object AppGraph {
     var store: StoreService? = null
         private set
 
+    /** 库根目录（模块 03 遮罩持久化等按目录寻址用；init 后可用） */
+    var libraryRoot: File? = null
+        private set
+
     /** 识别重试处理器（模块 01 落定后注入） */
     var ocrRetry: OcrRetryHandler? = null
         private set
@@ -36,6 +40,7 @@ object AppGraph {
         initialized = true
         val appContext = context.applicationContext
         val root = LibraryRoot.get(appContext)
+        libraryRoot = root
         val encoder = WebpImageEncoder()
         store = StoreService(root, index, encoder, ThumbService(appContext.cacheDir, encoder))
         // 启动扫描：<root>/<科目>/<条目目录>/meta.json → 内存索引 + 缩略图探测

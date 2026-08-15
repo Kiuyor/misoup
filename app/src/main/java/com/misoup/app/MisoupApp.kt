@@ -10,11 +10,12 @@ import androidx.navigation.navArgument
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.padding
 import com.misoup.app.ui.screens.HomeScreen
-import com.misoup.app.ui.screens.ReviewScreen
 import com.misoup.app.ui.screens.MineScreen
 import com.misoup.app.ui.screens.library.LibraryScreen
 import com.misoup.app.ui.screens.library.LibraryDetailScreen
 import com.misoup.app.ui.screens.library.LibraryEditScreen
+import com.misoup.app.ui.screens.review.ReviewScreen
+import com.misoup.app.ui.screens.review.ReviewCardScreen
 import com.misoup.app.ui.components.MisoupBottomBar
 
 /** 应用导航宿主：底部 4 tab + 错题库详情/编辑页 */
@@ -57,7 +58,10 @@ fun MisoupApp() {
                     onDone = { navController.popBackStack() }
                 )
             }
-            composable("review") { ReviewScreen() }
+            composable("review") { ReviewScreen(onStartRedo = { navController.navigate("review/redo") }) }
+            composable("review/redo") {
+                ReviewCardScreen(onBack = { navController.popBackStack() })
+            }
             composable("mine") { MineScreen() }
         }
     }
