@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 汤碗意象：碗身 + 热气 -->
+    <path
+        android:fillColor="#D97A38"
+        android:pathData="M30,50 h48 a24,24 0 0 1 -48,0 z" />
+    <path
+        android:fillColor="#F4C79A"
+        android:pathData="M30,50 h48 a24,24 0 0 1 -48,0 z M34,52 h40 a20,20 0 0 1 -40,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,34 c-2,-6 2,-8 0,-14 M54,34 c-2,-6 2,-8 0,-14 M64,34 c-2,-6 2,-8 0,-14"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+</vector>
