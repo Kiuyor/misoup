@@ -39,12 +39,13 @@ class StoreService(
             try {
                 require(meta.id.isNotBlank()) { "id 不能为空" }
                 require(meta.subject.isNotBlank()) { "科目不能为空" }
-                // 幂等保护：id 已存在或目标目录名已存在 → 失败
+                // 幂等保护：id 已存在 → 失败（同 id 不允许重复）
                 check(index.get(meta.id) == null) { "条目已存在: ${meta.id}" }
-                val dirName = displayNameOf(meta, text)
+                // 目录名冲突兜底：连拍/批量同毫秒落库时时间戳命名可能相同，
+                // 追加递增序号（-2/-3…）保证每张独立落库，不阻塞录入（模块 01 铁律）
+                val dirName = uniqueDirName(displayNameOf(meta, text), meta.subject)
                 val subjectDir = File(root, meta.subject)
                 val target = File(subjectDir, dirName)
-                check(!target.exists()) { "目标目录已存在: $dirName" }
 
                 // 1. 临时目录（库根下 .tmp-*，与目标同卷保证原子 rename）
                 val tmp = File(root, ".tmp-${System.currentTimeMillis()}")
@@ -324,5 +325,13 @@ class StoreService(
     private fun displayNameOf(meta: MisoupMeta, text: String?): String {
         val summarySource = text?.takeIf { it.isNotBlank() } ?: meta.note
         return NameGenerator.generate(System.currentTimeMillis(), summarySource)
+    }
+
+    /** 目录名唯一化：目标已存在则追加 -2/-3…（同毫秒连拍/批量不阻塞） */
+    private fun uniqueDirName(base: String, subject: String): String {
+        if (!File(File(root, subject), base).exists()) return base
+        var n = 2
+        while (File(File(root, subject), "$base-$n").exists()) n++
+        return "$base-$n"
     }
 }

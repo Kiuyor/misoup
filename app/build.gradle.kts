@@ -68,6 +68,10 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     // 图像预处理链（模块 01）：OpenCV 用于矫正/画质增强（JNI 在真机/模拟器加载）
     implementation(libs.opencv)
+    // 相机采集（模块 01 T02/T03）：CameraX 三件套（camera2 后端 + lifecycle 绑定 + PreviewView）
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
 
     // 识别相关：onnxruntime-android 由模块 05 引入，避免骨架 APK 体积膨胀
     testImplementation(libs.junit)

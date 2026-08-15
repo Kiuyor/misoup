@@ -9,6 +9,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.padding
+import com.misoup.app.ui.capture.CameraCaptureScreen
+import com.misoup.app.ui.capture.CaptureProgressScreen
 import com.misoup.app.ui.screens.HomeScreen
 import com.misoup.app.ui.screens.MineScreen
 import com.misoup.app.ui.screens.library.LibraryScreen
@@ -31,7 +33,33 @@ fun MisoupApp() {
             startDestination = "home",
             modifier = androidx.compose.ui.Modifier.padding(innerPadding)
         ) {
-            composable("home") { HomeScreen() }
+            composable("home") {
+                HomeScreen(
+                    onCapture = { mode -> navController.navigate("capture?mode=$mode") },
+                    onProgress = { navController.navigate("capture/progress") }
+                )
+            }
+            // 模块 01：相机拍照/连拍页（mode=single|burst）
+            composable(
+                route = "capture?mode={mode}",
+                arguments = listOf(navArgument("mode") { type = NavType.StringType; defaultValue = "single" })
+            ) { backStackEntry ->
+                val mode = backStackEntry.arguments?.getString("mode") ?: "single"
+                CameraCaptureScreen(
+                    mode = mode,
+                    onBack = { navController.popBackStack() },
+                    onCaptured = { uris ->
+                        navController.popBackStack()
+                        // 相机产物经会话桥交给进度页统一提交（连拍一批）
+                        com.misoup.app.ui.capture.CaptureSession.pendingUris = uris
+                        navController.navigate("capture/progress")
+                    }
+                )
+            }
+            // 模块 01：全屏收录进度页（选图/拍照/连拍共用）
+            composable("capture/progress") {
+                CaptureProgressScreen(onBack = { navController.popBackStack() })
+            }
             composable("library") {
                 LibraryScreen(
                     onOpen = { id -> navController.navigate("library/detail/${Uri.encode(id)}") }
