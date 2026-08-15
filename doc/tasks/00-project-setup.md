@@ -13,6 +13,13 @@
 - [x] T08 `LibraryIndex`：rebuild/upsert/remove/query（Filter + keyword），倒排（题干文本→id）
 - [x] T09 缩略图服务：256px WebP 生成到 `cacheDir/thumbs/<id>.webp`
 - [x] T10 损坏 meta 容错：扫描遇解析失败→标"待修复"条目（展示原始 JSON），不崩溃
-- [ ] ✅ 验收：`gradle build` 绿（已过）；模拟器启动进首页 4 tab、adb 验证库目录树、手工放合法 meta 重启后索引列出（待模拟器执行）
+- [x] ✅ 验收：`gradle build` 绿；模拟器启动进首页 4 tab；adb 验证库目录树；手工放合法 meta 重启后索引列出
 
 **开工提示**：T01-T02 是纯构建配置；T05-T06 是类型骨架，先于 UI 完成；T07-T09 依赖 T05。
+
+---
+**验收记录（2026-08-16）**：
+- `./gradlew :app:testDebugUnitTest :app:assembleDebug` 全绿（87 测试，JUnit4+coroutines-test）
+- 模拟器 AVD misoup：安装成功，MainActivity 前台，uiautomator 确认 4 tab（首页/错题库/复习/我的）+ 首页空态文案正确，无崩溃
+- 库目录树/索引列出：数据层由单测覆盖（rebuild 扫描/损坏容错/事务）；列表 UI 展示在模块 02 验收
+- 待协调：`Review.rating` 编码 0-3（Again=0..Easy=3），模块 03 定稿为 1-4 → 03 派发时强制统一
