@@ -66,10 +66,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
 
-    // 识别相关：本模块仅声明，实现见模块 04/05
-    implementation(libs.opencv)
-    implementation(libs.onnxruntime.android)
-
+    // 识别相关：本模块仅声明版本（见 gradle/libs.versions.toml），不实现不依赖；
+    // opencv/onnxruntime-android 由模块 04/05 引入，避免骨架 APK 体积膨胀
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 

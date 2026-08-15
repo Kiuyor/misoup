@@ -7,7 +7,7 @@
 
 | 模块 | 任务数 | 里程碑 | 状态 | 任务清单 |
 |---|---|---|---|---|
-| 00 工程骨架与数据基座 | 10 | M0 | - [ ] | [00-project-setup.md](00-project-setup.md) |
+| 00 工程骨架与数据基座 | 10 | M0 | - [x] | [00-project-setup.md](00-project-setup.md) |
 | 01 录入管线 | 10 | M1 | - [ ] | [01-capture-pipeline.md](01-capture-pipeline.md) |
 | 02 错题库管理 | 10 | M1 | - [ ] | [02-library-management.md](02-library-management.md) |
 | 03 复习调度 | 10 | M2 | - [ ] | [03-review-scheduler.md](03-review-scheduler.md) |
@@ -21,7 +21,7 @@
 
 ## 进行中
 
-- **当前模块**：—（未开工）
+- **当前模块**：00 工程骨架（T01-T10 代码与单测完成、`gradle build` 绿；模拟器验收项待执行）
 - **上次更新**：2026-08-16
 
 ## 里程碑状态
