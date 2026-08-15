@@ -98,6 +98,8 @@ class LibraryIndex {
         // 题干文本倒排
         val text = runCatching { File(entryDir, parsed.textFile).readText() }.getOrNull()
         if (!text.isNullOrBlank()) indexText(parsed.id, text)
+        // 标签倒排（T03：关键词搜索命中标签）
+        indexTags(parsed.id, parsed.tags)
     }
 
     /** 读文本.md 首行作为摘要（列表展示） */
@@ -178,6 +180,19 @@ class LibraryIndex {
         idTokens[id] = tokens.toMutableSet()
     }
 
+    /**
+     * 标签分词 → 倒排（T03 关键词搜索命中标签）。
+     * 追加式：与 [indexText] 的题干 token 并存，token 汇总进 idTokens 便于清理。
+     */
+    fun indexTags(id: String, tags: List<String>) {
+        if (!entries.containsKey(id)) return
+        val tokens = tags.flatMap { TextTokenizer.tokenize(it) }
+        tokens.forEach { token ->
+            inverted.getOrPut(token) { mutableSetOf() }.add(id)
+        }
+        idTokens.getOrPut(id) { mutableSetOf() }.addAll(tokens)
+    }
+
     /** 清理某 id 的全部倒排关联（覆盖/删除时保证倒排一致） */
     private fun clearTokens(id: String) {
         idTokens.remove(id)?.forEach { token ->
@@ -216,6 +231,12 @@ class LibraryIndex {
     fun get(id: String): IndexedEntry? = entries[id]
 
     fun size(): Int = entries.size
+
+    /** 刷新条目 mtime（列表按最近编辑排序；文本更新/重命名后调用） */
+    fun touch(id: String, mtime: Long = System.currentTimeMillis()) {
+        val e = entries[id] ?: return
+        entries[id] = e.copy(mtime = mtime)
+    }
 
     /** 科目 → 条目数（学情统计/分组用） */
     fun countBySubject(): Map<String, Int> = entries.values.groupingBy { it.subject }.eachCount()

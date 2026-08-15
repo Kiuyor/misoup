@@ -73,6 +73,7 @@ class StoreService(
                     }
                     index.upsert(meta, thumbPath, dirName = dirName)
                     text?.let { index.indexText(meta.id, it) }
+                    index.indexTags(meta.id, meta.tags)   // T03：关键词搜索命中标签
                     Result.success(dirName)
                 } catch (e: Throwable) {
                     tmp.deleteRecursively()   // 失败清理，库内无残留
@@ -114,6 +115,8 @@ class StoreService(
                     throw e
                 }
                 index.upsert(updated, entry.thumbPath)
+                // upsert 已清倒排 → 按磁盘最新内容重建（题干 + 标签，T03）
+                reindexEntry(entryDir, id, updated)
                 Result.success(Unit)
             } catch (e: Throwable) {
                 Result.failure(e)
@@ -178,13 +181,109 @@ class StoreService(
                 val movedMeta = readMeta(target)
                     ?: throw IllegalStateException("移动后 meta.json 不可读")
                 index.upsert(movedMeta, entry.thumbPath)
+                reindexEntry(target, id, movedMeta)   // upsert 清倒排后重建
                 Result.success(Unit)
             } catch (e: Throwable) {
                 Result.failure(e)
             }
         }
 
+    // ---------- 模块 02 追加：读取 / 文本更新 / 重命名 ----------
+
+    /** 读取条目 meta（详情/编辑页用）；条目不存在或 meta 不可读 → failure */
+    suspend fun readMetaById(id: String): Result<MisoupMeta> = mutex.withLock {
+        runCatching {
+            val entry = index.get(id) ?: throw IllegalArgumentException("条目不存在: $id")
+            val dir = resolveEntryDir(entry.subject, entry.dirName)
+                ?: throw IllegalStateException("条目目录丢失: ${entry.dirName}")
+            readMeta(dir) ?: throw IllegalStateException("meta.json 不可读: ${entry.dirName}")
+        }
+    }
+
+    /** 读取条目 文本.md（详情/编辑页用）；无文本文件按空串处理 */
+    suspend fun readTextById(id: String): Result<String> = mutex.withLock {
+        runCatching {
+            val entry = index.get(id) ?: throw IllegalArgumentException("条目不存在: $id")
+            val dir = resolveEntryDir(entry.subject, entry.dirName)
+                ?: throw IllegalStateException("条目目录丢失: ${entry.dirName}")
+            val f = File(dir, entry.textFile)
+            if (!f.isFile) return@runCatching ""
+            f.readText()
+        }
+    }
+
+    /**
+     * 解析条目原图绝对路径（详情页 Coil 大图用）。
+     * 优先 images.original；无原图文件返回 null（UI 显示占位）。
+     */
+    suspend fun imagePathById(id: String): Result<String?> = mutex.withLock {
+        runCatching {
+            val entry = index.get(id) ?: return@runCatching null
+            val dir = resolveEntryDir(entry.subject, entry.dirName) ?: return@runCatching null
+            val meta = readMeta(dir) ?: return@runCatching null
+            val f = File(dir, meta.images.original)
+            if (f.isFile) f.absolutePath else null
+        }
+    }
+
+    /**
+     * 更新 文本.md（编辑页题干/答案/解析保存）：原子覆盖 + 倒排刷新 + mtime 刷新。
+     * 文本更新后列表按最近编辑排序（touch）。
+     */
+    suspend fun updateText(id: String, text: String): Result<Unit> = mutex.withLock {
+        try {
+            val entry = index.get(id) ?: throw IllegalArgumentException("条目不存在: $id")
+            val entryDir = resolveEntryDir(entry.subject, entry.dirName)
+                ?: throw IllegalStateException("条目目录丢失: ${entry.dirName}")
+            val tmp = File(entryDir, ".text-${System.currentTimeMillis()}.tmp")
+            try {
+                tmp.writeText(text)
+                atomicReplace(tmp, File(entryDir, entry.textFile))
+            } catch (e: Throwable) {
+                tmp.delete()
+                throw e
+            }
+            // 倒排刷新（题干全文 + 标签搜索命中新文本；空白文本清空旧倒排）
+            index.indexText(id, text)
+            readMeta(entryDir)?.let { index.indexTags(id, it.tags) }
+            index.touch(id)
+            Result.success(Unit)
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 重命名目录（T09）：目录名 = 展示名可改，meta.id（UUID）不变。
+     * 原子目录 rename + 索引以新目录名重建；同名 → 无操作成功。
+     */
+    suspend fun rename(id: String, newDirName: String): Result<Unit> = mutex.withLock {
+        try {
+            require(newDirName.isNotBlank()) { "目录名不能为空" }
+            val entry = index.get(id) ?: throw IllegalArgumentException("条目不存在: $id")
+            if (entry.dirName == newDirName) return@withLock Result.success(Unit)
+            val entryDir = resolveEntryDir(entry.subject, entry.dirName)
+                ?: throw IllegalStateException("条目目录丢失: ${entry.dirName}")
+            val target = File(File(root, entry.subject), newDirName)
+            check(!target.exists()) { "目标目录已存在: $newDirName" }
+            check(entryDir.renameTo(target)) { "重命名失败" }
+            val current = readMeta(target) ?: throw IllegalStateException("重命名后 meta.json 不可读")
+            index.upsert(current, entry.thumbPath, dirName = newDirName)
+            reindexEntry(target, id, current)   // upsert 清倒排后重建
+            Result.success(Unit)
+        } catch (e: Throwable) {
+            Result.failure(e)
+        }
+    }
+
     // ---------- 内部工具 ----------
+
+    /** 条目文本 + 标签重建倒排（upsert 清 token 后调用；文本缺失按空处理） */
+    private fun reindexEntry(entryDir: File, id: String, meta: MisoupMeta) {
+        val text = runCatching { File(entryDir, meta.textFile).readText() }.getOrNull() ?: ""
+        index.indexText(id, text)
+        index.indexTags(id, meta.tags)
+    }
 
     /** 原子替换文件：优先 ATOMIC_MOVE（同卷），不支持则 REPLACE_EXISTING 兜底 */
     private fun atomicReplace(source: File, target: File) {
