@@ -9,7 +9,7 @@
 - [ ] T04 复习组：FSRS 参数高级编辑（17 个 w + short-term 开关）、提醒时间（V2 通知开关占位）
 - [ ] T05 数据组：库目录（当前路径 + SAF 迁移）、WebDAV 配置（09）、备份/恢复/导入/导出（09）、清理缓存
 - [ ] T06 关于组：版本号、GitHub 链接、GPL-3.0、隐私政策（链接+摘要）、捐赠（爱发电）
-- [ ] T07 凭据安全：EncryptedSharedPreferences 统一封装（WebDAV/百度/BYOK Key）
+- [x] T07 凭据安全：EncryptedSharedPreferences 统一封装（WebDAV/百度/BYOK Key）
 - [ ] T08 网络与日志：HTTPS 强制拦截（http 请求拒绝+提示）；日志脱敏（无 Key/密码/内容）
 - [ ] T09 兼容适配：API 26-36 差异（Photo Picker 回退 ACTION_OPEN_DOCUMENT、POST_NOTIFICATIONS）；vivo/小米/华为白名单引导页（Build.MANUFACTURER 检测）
 - [ ] T10 合规文件：PRIVACY.md（数据本地/无遥测/BYOK 说明）、LICENSE（GPL-3.0）、THIRD-PARTY-NOTICES
