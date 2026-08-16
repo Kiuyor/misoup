@@ -11,17 +11,17 @@
 | 01 录入管线 | 10 | M1 | - [x] | [01-capture-pipeline.md](01-capture-pipeline.md) |
 | 02 错题库管理 | 10 | M1 | - [x] | [02-library-management.md](02-library-management.md) |
 | 03 复习调度 | 10 | M2 | - [x] | [03-review-scheduler.md](03-review-scheduler.md) |
-| 04 离线 OCR | 8 | M3 | - [ ] | [04-offline-ocr.md](04-offline-ocr.md) |
-| 05 视觉 LLM 识别 | 9 | M3 | - [ ] | [05-vision-llm.md](05-vision-llm.md) |
-| 06 整页拆题 | 5 | M3末 | - [ ] | [06-page-splitting.md](06-page-splitting.md) |
-| 07 AI 增强 | 7 | M4 | - [ ] | [07-ai-enhance.md](07-ai-enhance.md) |
-| 08 输出与导出 | 8 | M5 | - [ ] | [08-export-output.md](08-export-output.md) |
-| 09 同步与备份 | 8 | 贯穿 | - [ ] | [09-sync-backup.md](09-sync-backup.md) |
-| 10 设置与安全 | 10 | 贯穿 | - [ ] | [10-settings-security.md](10-settings-security.md) |
+| 04 离线 OCR | 8 | M3 | - [x] | [04-offline-ocr.md](04-offline-ocr.md) |
+| 05 视觉 LLM 识别 | 9 | M3 | - [x] | [05-vision-llm.md](05-vision-llm.md) |
+| 06 整页拆题 | 5 | M3末 | - [x] | [06-page-splitting.md](06-page-splitting.md) |
+| 07 AI 增强 | 7 | M4 | - [x] | [07-ai-enhance.md](07-ai-enhance.md) |
+| 08 输出与导出 | 8 | M5 | - [x] | [08-export-output.md](08-export-output.md) |
+| 09 同步与备份 | 8 | 贯穿 | - [x] | [09-sync-backup.md](09-sync-backup.md) |
+| 10 设置与安全 | 10 | 贯穿 | - [x] | [10-settings-security.md](10-settings-security.md) |
 
 ## 进行中
 
-- **当前模块**：04（P2 批：04/05 并行）
+- **当前模块**：全部完成（P4 收尾）
 - **上次更新**：2026-08-16
 
 ## 里程碑状态
@@ -29,9 +29,9 @@
 - [x] **M0 骨架**（00）
 - [x] **M1 录入闭环**（01, 02）
 - [x] **M2 复习闭环**（03）
-- [ ] **M3 识别增强**（04, 05, 06）
-- [ ] **M4 AI 增强**（07）
-- [ ] **M5 输出收尾**（08, 09, 10）
+- [x] **M3 识别增强**（04, 05, 06）
+- [x] **M4 AI 增强**（07）
+- [x] **M5 输出收尾**（08, 09, 10）
 
 ## 环境与前置（人肉清单）
 
@@ -48,3 +48,10 @@
 - 模拟器：安装成功 → MainActivity 前台 → uiautomator 确认 4 tab（首页/错题库/复习/我的）+ 空态文案正确 → 无崩溃；截图 doc/verify/m0-home.png
 - 库树/索引列出：数据层单测覆盖 rebuild 扫描/损坏容错；列表 UI 展示在模块 02 验收
 - ⚠ 待协调：`Review.rating` 编码 0-3，模块 03 定稿 1-4 → 03 派发时强制统一
+
+## 最终验收记录（2026-08-16）
+
+- 全量 `./gradlew :app:testDebugUnitTest :app:assembleDebug` 绿：**973 测试 0 失败**，APK 226MB（debug）
+- 模拟器全功能冒烟：首页 3 大按钮 + 整页拆题入口 + 今日待复习横幅；错题库筛选/搜索；复习统计卡；设置页全分组（AI/识别模型/复习/数据/关于/同步）
+- 截图：doc/verify/m0-home.png / m1-home.png / m1-library.png / m1-review.png / final-home.png / final-mine.png
+- 里程碑 M0-M5 全部完成
