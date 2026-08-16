@@ -26,10 +26,24 @@ class AndroidImageLoader(
             val uri = Uri.parse(source.uri)
             val resolver = context.contentResolver
             val decoderSource = ImageDecoder.createSource(resolver, uri)
-            ImageDecoder.decodeBitmap(decoderSource) { decoder, _, _ ->
+            ImageDecoder.decodeBitmap(decoderSource) { decoder, info, _ ->
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 decoder.isMutableRequired = false
+                // FINDING 4：超大图（相机 12MP+）按长边上限降采样，防批量录入/连拍 OOM
+                val longEdge = maxOf(info.size.width, info.size.height)
+                if (longEdge > MAX_DECODE_EDGE) {
+                    val scale = MAX_DECODE_EDGE.toFloat() / longEdge
+                    decoder.setTargetSize(
+                        (info.size.width * scale).toInt().coerceAtLeast(1),
+                        (info.size.height * scale).toInt().coerceAtLeast(1)
+                    )
+                }
             }
         }.getOrNull()
+    }
+
+    companion object {
+        /** 解码长边上限：4096px 足够 OCR/矫正使用，内存 ~64MB/张（RGBA 全尺寸 12MP 约 48MB，4 倍于此） */
+        private const val MAX_DECODE_EDGE = 4096
     }
 }

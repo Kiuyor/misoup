@@ -129,7 +129,11 @@ fun SplitPageEntryScreen(
                     vm = remember(bitmap) { SplitPageViewModel(lines, bitmap!!.width) },
                     onBack = onBack,
                     submitter = { boxes ->
-                        SplitEntrySubmitter(store = store).submitAll(bitmap!!, boxes)
+                        SplitEntrySubmitter(
+                            store = store,
+                            // FINDING 3：拆题入库后裁剪图入队识别（识别队列在 CaptureCoordinator 内）
+                            onRecognize = { id, bmp -> AppGraph.captureCoordinator?.enqueueRecognition(id, bmp) }
+                        ).submitAll(bitmap!!, boxes)
                     },
                 )
             } else {

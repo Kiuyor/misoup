@@ -116,6 +116,9 @@ class ImportExportService(
             .getOrNull() ?: return ImportOutcome.INVALID
         if (index.get(meta.id) != null) return ImportOutcome.DUPLICATE   // 重复 id 跳过
         if (meta.subject.isBlank() || meta.id.isBlank()) return ImportOutcome.INVALID
+        // D 修复：subject 必须为合法单段目录名——拒绝路径分隔/穿越/隐藏名，
+        // 否则 File(库根, subject) 可写到库外或产生嵌套目录（同步层按两段路径定位会失联）
+        if (!isSafeSubject(meta.subject)) return ImportOutcome.INVALID
 
         // 目标目录名：优先 manifest/目录原名，冲突追加序号
         val targetBase = dir.name
@@ -130,6 +133,12 @@ class ImportExportService(
         index.upsert(meta, null, dirName = target.name)
         return ImportOutcome.IMPORTED
     }
+
+    /** 合法科目目录名：非空、单段、非隐藏、非路径穿越（D 修复） */
+    private fun isSafeSubject(subject: String): Boolean =
+        subject.isNotBlank() &&
+            !subject.contains('/') && !subject.contains('\\') &&
+            !subject.startsWith(".") && subject != ".."
 
     /** staging 下扫描：<科目>/<条目目录>/meta.json 结构 */
     private fun scanEntryDirs(root: File): List<File> {

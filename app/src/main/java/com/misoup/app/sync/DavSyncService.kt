@@ -161,20 +161,33 @@ class DavSyncService(
         )
     }
 
-    /** 上传整条目目录（mkdirst 远端目录 → 逐个文件 PUT） */
+    /** 上传整条目目录（远端逐级 mkdir → 递归收集全部文件逐个 PUT） */
     private suspend fun uploadEntry(root: String, relPath: String): Boolean {
         val localDir = LocalScanner.resolveEntryDir(libraryRoot, relPath) ?: return false
         val remoteDir = "$root/$relPath"
         return runCatching {
             client.mkdirs(remoteDir)
-            val files = localDir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") } ?: emptyList()
+            // B 修复：递归收集（含 变式/ 等子目录），与 RemoteScanner「条目内深层文件也聚合进指纹」口径一致
+            val files = localDir.walkTopDown()
+                .filter { it.isFile && !it.name.startsWith(".") }
+                .toList()
             files.all { f ->
-                client.upload(f, "$remoteDir/${f.name}")
+                val rel = f.relativeTo(localDir).path.replace('\\', '/')
+                val remote = "$remoteDir/$rel"
+                if (client.upload(f, remote)) {
+                    // A 附带：上传后把本地 mtime 对齐服务器 Last-Modified——
+                    // 否则本地指纹（本地时钟）与远端指纹（服务器时钟）永不一致，
+                    // 下次同步误判「远端变」→ 全库无限下载回环
+                    client.lastModified(remote)?.let { f.setLastModified(it) }
+                    true
+                } else {
+                    false
+                }
             }
         }.getOrDefault(false)
     }
 
-    /** 下载整条目目录（远端文件清单来自 PROPFIND 结果，本地逐文件落盘） */
+    /** 下载整条目目录（远端文件清单来自 PROPFIND 结果，按相对路径落盘保持子目录结构） */
     private suspend fun downloadEntry(root: String, relPath: String): Boolean {
         return runCatching {
             val remoteListing = client.listRecursive("$root/$relPath")
@@ -182,9 +195,17 @@ class DavSyncService(
             if (files.isEmpty()) return@runCatching false   // 远端空目录不视为条目
             val localDir = LocalScanner.ensureEntryDir(libraryRoot, relPath) ?: return@runCatching false
             val ok = files.all { info ->
-                val name = info.path.substringAfterLast('/')
-                val target = File(localDir, name)
-                client.download("$root/$relPath/$name", target)
+                // B 修复：远端条目内相对路径（如 变式/v1.md）原样落盘，不拍平到条目根
+                val rel = info.path
+                val target = File(localDir, rel)
+                val remote = "$root/$relPath/$rel"
+                if (client.download(remote, target)) {
+                    // A 附带：下载后本地 mtime 对齐服务器 Last-Modified（双端指纹一致，防回环）
+                    client.lastModified(remote)?.let { target.setLastModified(it) }
+                    true
+                } else {
+                    false
+                }
             }
             if (ok) indexDownloaded(localDir)
             ok

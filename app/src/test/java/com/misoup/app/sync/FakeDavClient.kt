@@ -116,6 +116,8 @@ class FakeDavClient : DavClient {
         return true
     }
 
+    override suspend fun lastModified(remotePath: String): Long? = files[remotePath]?.mtime
+
     override suspend fun delete(remotePath: String): Boolean {
         deleteCalls += remotePath
         files.keys.removeAll { it == remotePath || it.startsWith("$remotePath/") }

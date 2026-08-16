@@ -28,3 +28,6 @@ hs_err_pid*
 # Build artifacts
 *.apk
 *.aab
+
+# Review scratch traces (durable record lives in findings.md)
+.deep-review/

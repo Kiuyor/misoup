@@ -13,11 +13,14 @@ import java.util.Locale
  */
 object NameGenerator {
 
-    /** 公式/排版符号（剔除）：LaTeX 定界符与命令符、常见标记 */
-    private val FORMULA_CHARS = Regex("[\\\\\\$\\{\\}\\^_\\[\\]\\|~`=<>*#&%]")
-
-    /** 空白字符 */
-    private val WHITESPACE = Regex("\\s+")
+    /**
+     * 公式/排版符号（剔除）：LaTeX 定界符与命令符、常见标记、路径分隔符。
+     * FINDING 8：路径分隔符 / 和 \ 必须剔除，否则含 / 的题干生成目录名后 File 创建失败。
+     */
+    private val FORMULA_CHARS = setOf(
+        '\\', '/', '$', '{', '}', '^', '_', '[', ']',
+        '|', '~', '`', '=', '<', '>', '*', '#', '&', '%'
+    )
 
     /**
      * 生成目录名。空摘要时省略摘要段（仅时间戳），避免尾部下划线。
@@ -35,13 +38,11 @@ object NameGenerator {
     }
 
     /**
-     * 清洗摘要：去空白 + 去公式符 + 截前 12 字。
+     * 清洗摘要：去公式符号 + 去空白 + 截前 12 字。
      * 注意：先截断后清洗会留下残缺符号，故先清洗后截断。
      */
     fun cleanSummary(summary: String): String {
-        val stripped = FORMULA_CHARS.replace(summary, "")
-            .replace(WHITESPACE, "")
-            .trim()
+        val stripped = summary.filter { it !in FORMULA_CHARS && !it.isWhitespace() }.trim()
         return if (stripped.length <= MisoupConfigConst.NAME_SUMMARY_LENGTH) {
             stripped
         } else {

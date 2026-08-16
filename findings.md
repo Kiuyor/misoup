@@ -5,6 +5,10 @@
 > 方法: 37 项动作清单 → 核心数据流逐行追踪(StoreService/SyncDiff/DavSync/RecognitionQueue/索引/备份恢复)+ 3 个并行子代理深挖(同步备份、录入识别拆题、复习导出设置)。两个子代理的结论与主追踪交叉确认;同步子代理中途挂起,其领域由主追踪独立验证补全。
 >
 > **修复状态(2026-08-16): 全部 9 项已修复,977 测试全绿(原 973 + 4 个新回归测试)。**
+>
+> **第二轮(子代理回补): 3 个并行子代理全部返回后,确认 F1-F9 修复有效,并发现 1 个 CRITICAL + 6 个 MEDIUM 级新 bug,已全部修复,984 测试全绿。** 新增修复: A) SardineDavClient.mkdirs 把完整 URL 分段当目录,首段 "https:" 致上传 100% 失败(CRITICAL,OkHttp 实测) → 改为仅迭代路径部分; A附带) 上传/下载后本地 mtime 对齐服务器 Last-Modified,防双端指纹永不一致导致无限同步回环; C) 凭据变更自动刷新(lazy 单例旧凭据问题); B) 变式子目录递归上传/相对路径下载(变式题永不备份问题); D) 导入 subject 目录名校验(防路径穿越); F) 编辑页科目变更走 store.move(防条目失联+远端备份被删); FINDING 3) 整页拆题落库后入队识别(否则永久 ocr=pending); FINDING 4) 解码 4096px 降采样 + 失败位图缓存上限 20(防批量 OOM); FINDING 5) 落库 IO 切后台线程(可注入 dispatcher); FINDING 6) 启动补扫遗留 pending 条目; FINDING 7) 模型下载原子写(.part + rename,防半写文件过检); FINDING 8) NameGenerator 清洗路径分隔符 + 重命名校验。
+>
+> **已知残留(需产品决策,未擅改)**: C5 录入落库存未矫正原图(与 DETAILED-DESIGN「矫正后 ≤300KB」文档冲突,改动影响原图/缩略图语义); E 同步文件级竞争(mtime 时钟偏差属指纹方案设计限制)。
 
 ## Summary
 

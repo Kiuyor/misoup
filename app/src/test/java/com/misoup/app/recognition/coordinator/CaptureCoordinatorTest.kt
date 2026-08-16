@@ -11,6 +11,7 @@ import com.misoup.app.data.store.StoreService
 import com.misoup.app.pipeline.PreprocessResult
 import com.misoup.app.recognition.Recognizer
 import com.misoup.app.recognition.queue.RecognitionPhase
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -69,6 +70,8 @@ class CaptureCoordinatorTest {
         loader = loader,
         preprocess = preprocess,
         scope = this,
+        // 测试注入测试调度器：withContext 不切真实线程，保持 runTest 时序可控
+        ioDispatcher = coroutineContext[kotlin.coroutines.ContinuationInterceptor] as CoroutineDispatcher,
         assetFactory = { _, format -> FakeImageAsset(10, 10, format) },
         clock = clock
     )

@@ -31,6 +31,8 @@ class LibraryEditViewModel(
         val answer: String = "",
         val explanation: String = "",
         val subject: String = "",
+        /** 进入编辑页时的磁盘科目（save 时与 [subject] 比较，变化则走 move 搬目录，F 修复） */
+        val originalSubject: String = "",
         val questionType: String = "",
         val errorReasons: Set<String> = emptySet(),
         val tags: List<String> = emptyList(),
@@ -64,6 +66,7 @@ class LibraryEditViewModel(
                     answer = text.answer,
                     explanation = text.explanation,
                     subject = meta?.subject ?: entry?.subject ?: "",
+                    originalSubject = meta?.subject ?: entry?.subject ?: "",
                     questionType = meta?.questionType ?: entry?.questionType ?: "",
                     errorReasons = meta?.errorReasons?.toSet() ?: emptySet(),
                     tags = meta?.tags ?: emptyList(),
@@ -127,18 +130,42 @@ class LibraryEditViewModel(
         viewModelScope.launch {
             _state.update { it.copy(saving = true, message = null) }
             val now = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-            val metaResult = store?.update(s.id) { meta ->
-                meta.copy(
-                    subject = s.subject,
-                    questionType = s.questionType,
-                    errorReasons = s.errorReasons.toList(),
-                    tags = s.tags,
-                    knowledgePoints = s.knowledgePoints,
-                    source = s.source,
-                    note = s.note,
-                    updatedAt = now
-                )
-            } ?: Result.failure(IllegalStateException("存储未初始化"))
+            // F 修复：科目变更必须走 store.move（搬目录 + meta.subject 同步），
+            // 否则索引 subject 与磁盘目录解耦 → 同步层定位不到条目 → 远端备份被删除。
+            // 科目未变 → 常规 update。
+            val subjectChanged = s.originalSubject.isNotBlank() && s.subject != s.originalSubject
+            val metaResult: Result<Unit> = if (subjectChanged) {
+                val moved = store?.move(s.id, s.subject)
+                    ?: Result.failure(IllegalStateException("存储未初始化"))
+                // move 已更新 meta.subject，其余字段再 update 一次补齐
+                when {
+                    moved.isSuccess -> store?.update(s.id) { meta ->
+                        meta.copy(
+                            questionType = s.questionType,
+                            errorReasons = s.errorReasons.toList(),
+                            tags = s.tags,
+                            knowledgePoints = s.knowledgePoints,
+                            source = s.source,
+                            note = s.note,
+                            updatedAt = now
+                        )
+                    } ?: Result.failure(IllegalStateException("存储未初始化"))
+                    else -> moved
+                }
+            } else {
+                store?.update(s.id) { meta ->
+                    meta.copy(
+                        subject = s.subject,
+                        questionType = s.questionType,
+                        errorReasons = s.errorReasons.toList(),
+                        tags = s.tags,
+                        knowledgePoints = s.knowledgePoints,
+                        source = s.source,
+                        note = s.note,
+                        updatedAt = now
+                    )
+                } ?: Result.failure(IllegalStateException("存储未初始化"))
+            }
             val textResult = store?.updateText(
                 s.id,
                 LibraryTextFormat.toMarkdown(QuestionText(s.question, s.answer, s.explanation))
@@ -150,7 +177,7 @@ class LibraryEditViewModel(
                     saving = false,
                     saved = success,
                     message = when {
-                        success -> "已保存"
+                        success -> "已保存" + if (subjectChanged) "（科目已移动）" else ""
                         else -> "保存失败：${(metaResult.exceptionOrNull() ?: textResult.exceptionOrNull())?.message}"
                     }
                 )
@@ -164,6 +191,11 @@ class LibraryEditViewModel(
     fun renameDir() {
         val s = _state.value
         val newName = RenameLogic.computeDirName(System.currentTimeMillis(), s.question)
+        // FINDING 8：目录名必须合法（不含路径分隔符），非法则明确提示不执行
+        if (!RenameLogic.isSafeName(newName)) {
+            _state.update { it.copy(message = "重命名失败：目录名含非法字符（/ 或 \\）") }
+            return
+        }
         val entry = index.get(s.id)
         if (entry == null) {
             _state.update { it.copy(message = "条目不存在，无法重命名") }

@@ -20,6 +20,9 @@ interface DavClient {
     /** 下载 [remotePath] 到本地 [target]（父目录需已存在）；成功返回 true */
     suspend fun download(remotePath: String, target: File): Boolean
 
+    /** 远端资源最后修改时间（毫秒）；不存在/未知 → null（上传/下载后本地 mtime 对齐用） */
+    suspend fun lastModified(remotePath: String): Long?
+
     /** 删除远程资源（文件或目录）；不存在视为成功；成功返回 true */
     suspend fun delete(remotePath: String): Boolean
 

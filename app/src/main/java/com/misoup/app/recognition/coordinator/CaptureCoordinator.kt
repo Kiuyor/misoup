@@ -14,13 +14,16 @@ import com.misoup.app.pipeline.PreprocessResult
 import com.misoup.app.recognition.Recognizer
 import com.misoup.app.recognition.queue.RecognitionQueue
 import com.misoup.app.recognition.queue.RecognitionStatus
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * T08 采集协调器：逐张 加载 → 预处理 → 落库(ocr=pending) → 入识别队列
@@ -44,6 +47,8 @@ class CaptureCoordinator<T>(
     private val loader: CaptureImageLoader<T>,
     private val preprocess: PreprocessRunner<T>,
     private val scope: CoroutineScope,
+    /** 落库 IO 执行线程（FINDING 5：生产=Default 防主线程阻塞；测试注入测试调度器保持时序可控） */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val assetFactory: (T, ImageFormat) -> ImageAsset,
     private val clock: () -> String = { com.misoup.app.review.fsrs.FsrsTime.toIso(System.currentTimeMillis()) ?: "" },
     private val defaultSubject: String = CaptureDefaults.DEFAULT_SUBJECT
@@ -51,6 +56,30 @@ class CaptureCoordinator<T>(
 
     /** 识别队列（内部持有；单线程 worker 已在 [scope] 上启动） */
     private val queue = RecognitionQueue(store, index, recognizer, scope, clock).also { it.start() }
+
+    init {
+        // FINDING 6：进程被杀后遗留的 ocr=pending 条目（识别未完成）在启动时自动重新入队，
+        // 否则永久 pending、文本.md 永为空（拆题/批量录入被杀进程场景）
+        requeuePending()
+    }
+
+    /** 启动补扫：索引中 ocrStatus=pending 的条目从磁盘重载原图重新入队识别。
+     *  基于 init 时刻快照——只补扫「上次进程遗留」的 pending，不动态扫描（避免误抓刚落库的新条目）。 */
+    private fun requeuePending() {
+        val snapshot = index.all()
+            .filter { !it.needsRepair && it.ocrStatus == "pending" }
+        if (snapshot.isEmpty()) return
+        scope.launch {
+            snapshot.forEach { entry ->
+                runCatching {
+                    val path = store.imagePathById(entry.id).getOrNull() ?: return@forEach
+                    val bitmap = loader.load(CaptureSource("file://$path")) ?: return@forEach
+                    val result = preprocess.run(bitmap)
+                    queue.enqueue(RecognitionQueue.JobSpec(entry.id, result.enhanced))
+                }
+            }
+        }
+    }
 
     /** 识别状态透传（进度页徽标/列表 OCR 状态共用） */
     val recognitionStatus: StateFlow<Map<String, RecognitionStatus>> = queue.status
@@ -99,7 +128,11 @@ class CaptureCoordinator<T>(
         val bitmap = loader.load(source) ?: return null
         val result = preprocess.run(bitmap)
         val meta = buildMeta()
-        val stored = store.create(meta, assetFactory(bitmap, ImageFormat.WEBP), text = null)
+        // FINDING 5：落库（WebP 编码 + 缩略图 + 文件写）切后台线程——
+        // 否则 flow 在主线程收集时编码阻塞 UI（批量录入卡死/ANR）
+        val stored = withContext(ioDispatcher) {
+            store.create(meta, assetFactory(bitmap, ImageFormat.WEBP), text = null)
+        }
         if (stored.isFailure) return null
         queue.enqueue(RecognitionQueue.JobSpec(meta.id, result.enhanced))
         meta.id
@@ -118,6 +151,15 @@ class CaptureCoordinator<T>(
             val result = preprocess.run(bitmap)
             queue.enqueue(RecognitionQueue.JobSpec(id, result.enhanced))
         }
+    }
+
+    /**
+     * 外部按条目 id 直接入队识别（FINDING 3：整页拆题等场景落库后必须入队，
+     * 否则条目永久 ocr=pending、文本.md 永为空）。
+     * @param bitmap 已预处理（enhanced）的位图
+     */
+    fun enqueueRecognition(id: String, bitmap: T) {
+        queue.enqueue(RecognitionQueue.JobSpec(id, bitmap))
     }
 
     /** 停止识别队列 worker（测试收尾/界面销毁时调用；幂等） */

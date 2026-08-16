@@ -29,6 +29,8 @@ import java.util.UUID
 class SplitEntrySubmitter(
     private val store: StoreService,
     private val subject: String = SplitDefaults.DEFAULT_SUBJECT,
+    /** 落库成功后把裁剪图入队识别（FINDING 3：不入队则条目永久 ocr=pending、文本.md 永为空） */
+    private val onRecognize: (metaId: String, enhancedBitmap: Bitmap) -> Unit = { _, _ -> },
 ) {
 
     /**
@@ -65,7 +67,13 @@ class SplitEntrySubmitter(
         val result = PreprocessPipeline.run(cropped)
         val meta = buildMeta()
         val stored = store.create(meta, BitmapImageAsset(result.enhanced, ImageFormat.WEBP), text = null)
-        stored.isSuccess
+        if (stored.isSuccess) {
+            // FINDING 3：落库后入队识别（与录入流程一致：录入永不阻塞，识别后台异步）
+            onRecognize(meta.id, result.enhanced)
+            true
+        } else {
+            false
+        }
     }.getOrDefault(false)
 
     /** meta：source 与 tags 均带「整页拆题」；ocr=pending 与录入流程一致 */

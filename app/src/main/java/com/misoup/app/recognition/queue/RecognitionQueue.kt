@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
+/** 失败位图缓存上限（FINDING 4：防批量失败时位图无限累积 OOM） */
+private const val MAX_FAILED_JOBS = 20
+
 /** 识别阶段（进度页徽标 / 列表 OCR 状态共用） */
 enum class RecognitionPhase { PENDING, DONE, FAILED }
 
@@ -115,9 +118,17 @@ class RecognitionQueue<T>(
             failedJobs.remove(job.id)
             _status.update { it + (job.id to RecognitionStatus(RecognitionPhase.DONE)) }
         } else {
-            failedJobs[job.id] = job
+            cacheFailed(job)
             writeBackFailed(job.id, outcome.exceptionOrNull()?.message)
         }
+    }
+
+    /** 失败位图缓存（重试复用，不重新解码）；FINDING 4：设容量上限防长链失败累积内存 */
+    private fun cacheFailed(job: JobSpec<T>) {
+        if (failedJobs.size >= MAX_FAILED_JOBS) {
+            failedJobs.keys.firstOrNull()?.let { failedJobs.remove(it) }
+        }
+        failedJobs[job.id] = job
     }
 
     /** 识别成功回写：文本.md + meta.ocr.status=done + 倒排刷新（T09 文档约定） */

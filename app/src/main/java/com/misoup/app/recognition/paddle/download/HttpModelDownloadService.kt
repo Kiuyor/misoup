@@ -56,7 +56,7 @@ class HttpModelDownloadService(
         DownloadOutcome(version = version, files = files)
     }
 
-    /** 单文件下载：流式写盘 + 进度回调；HTTP 非 2xx / IO 异常 → 可重试异常 */
+    /** 单文件下载：流式写 .part 临时文件 + 进度回调；HTTP 非 2xx / IO 异常 → 可重试异常 */
     private fun downloadTo(
         url: String,
         target: File,
@@ -71,18 +71,30 @@ class HttpModelDownloadService(
             val body = response.body ?: throw DownloadException("下载 $role 失败: 空响应体", retryable = true)
             val total = body.contentLength()
             target.parentFile?.mkdirs()
-            target.outputStream().use { out ->
-                var done = 0L
-                body.byteStream().use { input ->
-                    val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val read = input.read(buf)
-                        if (read < 0) break
-                        out.write(buf, 0, read)
-                        done += read
-                        onProgress(DownloadProgress(role, done, total))
+            // FINDING 7：原子下载——先写 .part 临时文件，成功后 rename 为正式文件。
+            // 中断/失败不残留半写文件（否则体积校验仅有下限时截断文件会"过检"，OCR 永久失败）。
+            val part = File(target.parentFile, "${target.name}.part")
+            try {
+                part.outputStream().use { out ->
+                    var done = 0L
+                    body.byteStream().use { input ->
+                        val buf = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val read = input.read(buf)
+                            if (read < 0) break
+                            out.write(buf, 0, read)
+                            done += read
+                            onProgress(DownloadProgress(role, done, total))
+                        }
                     }
                 }
+                if (!part.renameTo(target)) {
+                    part.delete()
+                    throw DownloadException("下载 $role 失败: 文件落地失败", retryable = true)
+                }
+            } catch (e: Exception) {
+                part.delete()
+                throw e
             }
         }
     }
