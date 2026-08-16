@@ -62,6 +62,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onCapture: (mode: String) -> Unit = {},
     onProgress: () -> Unit = {},
+    onSplit: () -> Unit = {},
     vm: HomeBadgeViewModel = viewModel(factory = homeBadgeViewModelFactory())
 ) {
     val badge by vm.todayCount.collectAsState()
@@ -112,6 +113,19 @@ fun HomeScreen(
                     )
                 }
             )
+
+            Spacer(Modifier.size(16.dp))
+
+            // 模块 06：整页拆题入口（相册选整页 → 候选框 → 逐题入库）
+            OutlinedButton(
+                onClick = onSplit,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Filled.PhotoLibrary, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("整页拆题（批量录入）", style = MaterialTheme.typography.titleMedium)
+            }
 
             Spacer(Modifier.size(32.dp))
 

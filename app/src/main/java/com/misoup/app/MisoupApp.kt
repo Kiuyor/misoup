@@ -38,7 +38,8 @@ fun MisoupApp() {
             composable("home") {
                 HomeScreen(
                     onCapture = { mode -> navController.navigate("capture?mode=$mode") },
-                    onProgress = { navController.navigate("capture/progress") }
+                    onProgress = { navController.navigate("capture/progress") },
+                    onSplit = { navController.navigate("split") }
                 )
             }
             // 模块 01：相机拍照/连拍页（mode=single|burst）
@@ -120,6 +121,12 @@ fun MisoupApp() {
             // 模块 09：同步与备份设置页（WebDAV 配置/手动触发/报告）
             composable("sync") {
                 SyncScreen(onBack = { navController.popBackStack() })
+            }
+            // 模块 06：整页拆题入口（相册选整页 → 候选框 → 逐题入库）
+            composable("split") {
+                com.misoup.app.splitting.ui.SplitPageEntryScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }
