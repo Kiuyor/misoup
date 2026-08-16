@@ -51,6 +51,8 @@ fun SyncScreen(
     vm: SyncViewModel = viewModel(factory = syncViewModelFactory())
 ) {
     val state by vm.state.collectAsState()
+    // F2 反馈：录入后自动同步的运行/退避/结果来自 AppGraph.autoSync（App 级，独立于手动同步）
+    val autoSyncState by AppGraph.autoSync.state.collectAsState()
     var url by remember { mutableStateOf(state.config.url) }
     var username by remember { mutableStateOf(state.config.username) }
     var password by remember { mutableStateOf(state.config.password) }
@@ -123,7 +125,13 @@ fun SyncScreen(
                     Text("录入后自动同步", style = MaterialTheme.typography.bodyLarge)
                     Text("默认关；开启后每次录入结束自动增量同步", style = MaterialTheme.typography.bodySmall)
                 }
-                Switch(checked = state.autoSync, onCheckedChange = { vm.setAutoSync(it) })
+                Switch(
+                    checked = state.autoSync,
+                    onCheckedChange = {
+                        vm.setAutoSync(it)
+                        if (!it) AppGraph.autoSync.cancel()   // 关闭开关 → 立即放弃在跑的自动同步/退避重试
+                    }
+                )
             }
 
             Button(
@@ -163,6 +171,31 @@ fun SyncScreen(
                     "同步失败，${it / 1000}s 后自动重试（第 ${state.failedAttempts} 次）",
                     color = MaterialTheme.colorScheme.error
                 )
+            }
+
+            if (autoSyncState.triggered) {
+                HorizontalDivider()
+                Text("录入后自动同步", style = MaterialTheme.typography.titleSmall)
+                val running = autoSyncState.running
+                val nextRetry = autoSyncState.nextRetryInMs
+                val last = autoSyncState.lastResult
+                when {
+                    running -> Text("自动同步进行中…")
+                    nextRetry != null -> Text(
+                        "自动同步失败，${nextRetry / 1000}s 后自动重试（第 ${autoSyncState.retries} 次）",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    else -> last?.let { r ->
+                        if (r.isSuccess) {
+                            Text("自动同步完成：上传 ${r.uploaded} · 下载 ${r.downloaded} · 冲突 ${r.conflicts} · 删除 ${r.deleted}")
+                        } else {
+                            Text(
+                                "自动同步失败：${r.errors.firstOrNull() ?: "未知错误"}",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    } ?: Text("尚未触发过")
+                }
             }
         }
     }

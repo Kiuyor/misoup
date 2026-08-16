@@ -44,7 +44,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.misoup.app.AppGraph
 import com.misoup.app.recognition.coordinator.StorePhase
-import com.misoup.app.ui.sync.PrefsAutoSyncStore
 
 /**
  * T10 全屏采集进度页
@@ -68,15 +67,12 @@ fun CaptureProgressScreen(
         vm.submitPending()
     }
 
-    // F2：录入批次全部落库后，若开启「录入后自动同步」则后台自动增量同步（默认关，静默失败不打扰）
-    val context = androidx.compose.ui.platform.LocalContext.current
+    // F2：录入批次全部落库后，若开启「录入后自动同步」则触发自动增量同步。
+    // 决策/执行交给 AppGraph.autoSync（App 级存活单飞 + 指数退避 + 状态反馈），
+    // 本页仅负责在「全部落库」那一瞬时发出一次请求；离开页面不影响后台执行。
     LaunchedEffect(batch) {
         val allStored = batch.isNotEmpty() && batch.all { it.storePhase != StorePhase.STORING }
-        if (allStored && PrefsAutoSyncStore(context).enabled) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching { AppGraph.syncService.syncIncremental() }
-            }
-        }
+        if (allStored) AppGraph.autoSync.triggerIfEnabled()
     }
 
     val items = CaptureProgressMapper.map(batch, recognition)

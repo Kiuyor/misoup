@@ -18,12 +18,14 @@ import com.misoup.app.recognition.visionllm.CredentialStoreLlmKeyStore
 import com.misoup.app.recognition.visionllm.LlmConfigRepository
 import com.misoup.app.recognition.visionllm.PrefsLlmSettingsStore
 import com.misoup.app.recognition.visionllm.VisionLlmClient
+import com.misoup.app.sync.AutoSyncCoordinator
 import com.misoup.app.sync.DavSyncService
 import com.misoup.app.sync.webdav.CredentialStoreBridge
 import com.misoup.app.sync.webdav.DavCredentialRepository
 import com.misoup.app.sync.webdav.SardineDavClient
 import com.misoup.app.ui.capture.AndroidImageLoader
 import com.misoup.app.ui.library.OcrRetryHandler
+import com.misoup.app.ui.sync.PrefsAutoSyncStore
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +94,18 @@ object AppGraph {
 
     /** 采集/识别后台作用域（App 级存活；worker 单线程在队列内部保证） */
     private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** App 级后台 IO 作用域（自动同步等长期任务存活于导航之外） */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 录入后自动同步协调器（单飞 + 指数退避 + 状态反馈）；录制进度页调用 triggerIfEnabled */
+    val autoSync: AutoSyncCoordinator by lazy {
+        AutoSyncCoordinator(
+            scope = appScope,
+            sync = { syncService.syncIncremental() },
+            enabled = { PrefsAutoSyncStore(appContext!!).enabled }
+        )
+    }
 
     fun init(context: Context) {
         if (initialized) return
