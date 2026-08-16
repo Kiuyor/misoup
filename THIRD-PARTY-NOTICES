@@ -1,0 +1,38 @@
+# Third-Party Notices
+
+错题汤 Misoup 使用以下第三方开源组件。各自许可证全文见对应链接；本文件仅列出名称、用途与许可证。
+
+| 组件 | 用途 | 许可证 |
+|---|---|---|
+| AndroidX Core (androidx.core:core-ktx) | 基础兼容层 | Apache-2.0 |
+| AndroidX Activity (androidx.activity:activity-compose) | Compose 宿主 | Apache-2.0 |
+| AndroidX Compose (ui / material3 / material-icons-extended) | UI 框架 | Apache-2.0 |
+| AndroidX Navigation (navigation-compose) | 页面导航 | Apache-2.0 |
+| AndroidX Lifecycle (lifecycle-runtime / viewmodel-compose) | 生命周期与状态 | Apache-2.0 |
+| AndroidX WorkManager (work-runtime-ktx) | 后台任务（V2 提醒） | Apache-2.0 |
+| AndroidX Security (security-crypto) | EncryptedSharedPreferences 凭据加密 | Apache-2.0 |
+| AndroidX Camera (camera-camera2 / lifecycle / view) | 拍题/连拍 | Apache-2.0 |
+| Kotlinx Serialization (kotlinx-serialization-json) | meta.json 序列化 | Apache-2.0 |
+| Kotlinx Coroutines (kotlinx-coroutines-core) | 协程 | Apache-2.0 |
+| OkHttp (com.squareup.okhttp3:okhttp) | HTTP 客户端（LLM/下载） | Apache-2.0 |
+| Coil (io.coil-kt:coil-compose) | 图片加载 | Apache-2.0 |
+| OpenCV (org.opencv:opencv) | 图像矫正/画质增强 | Apache-2.0 |
+| ONNX Runtime Android (com.microsoft.onnxruntime:onnxruntime-android) | PaddleOCR 离线推理 | MIT |
+| Sardine Android (com.github.thegrizzlylabs:sardine-android) | WebDAV 同步 | Apache-2.0 |
+| JUnit 4 | 单元测试 | EPL-2.0 |
+
+## 算法与数据来源
+
+- **FSRS-4.5 调度算法**：自实现，公式与参数参照开源项目
+  [fsrs4anki](https://github.com/open-spaced-repetition/fsrs4anki)（FSRS-4.5 论文 "A Stochastic Short-Term Model for Reinforcing Memory"），MIT 协议精神下独立实现，未直接复制代码。
+- **PaddleOCR PP-OCRv4 mobile 模型**：PaddlePaddle 生态（Apache-2.0），模型文件随 APK 内置或经国内镜像下载，文件名为版本约定（见应用内「识别模型 → 自换模型说明」）。
+- **KaTeX**：LaTeX 数学渲染（本地资源，MIT）。
+
+## 备注
+
+- 本项目本体以 GPL-3.0 发布（见仓库根 LICENSE）。
+- 依赖许可证链接：
+  - Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0
+  - MIT: https://opensource.org/license/mit
+  - EPL-2.0: https://www.eclipse.org/legal/epl-2.0/
+  - GPL-3.0: https://www.gnu.org/licenses/gpl-3.0.html

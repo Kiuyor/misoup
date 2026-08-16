@@ -4,6 +4,9 @@
     <!-- 模块 01 T02：拍题/连拍需要相机（运行时动态申请） -->
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- 模块 10 T09：复习提醒（V2）运行时权限声明（API 33+ 动态申请，低版本自动忽略） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
