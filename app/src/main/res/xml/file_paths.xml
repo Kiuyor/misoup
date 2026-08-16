@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 分享 FileProvider 路径（模块 08 T07）：仅暴露 cache 与库根图片，最小授权 -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 多题 zip / 临时 paper.html 所在缓存目录 -->
+    <cache-path name="cache" path="." />
+    <!-- 单题分享：库根原图（getExternalFilesDir/library，免权限目录） -->
+    <external-files-path name="library" path="." />
+</paths>

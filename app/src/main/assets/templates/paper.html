@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="../katex/katex.min.css">
+<link rel="stylesheet" href="paper.css">
+</head>
+<body class="__MODE_CLASS__">
+<header class="paper-head">
+  <div class="head-left">
+    <h1 class="paper-title">__TITLE__</h1>
+    <div class="paper-meta">
+      <span class="meta-item">科目：__SUBJECT__</span>
+      <span class="meta-item">日期：__DATE__</span>
+      <span class="meta-item">共 __COUNT__ 题</span>
+    </div>
+  </div>
+  <div class="head-right">
+    <span class="head-name-line">姓名：____________</span>
+    <span class="head-score-line">得分：____________</span>
+  </div>
+</header>
+<main class="paper-body">
+__QUESTIONS_HTML__
+</main>
+<footer class="paper-foot">
+  <span>—— 错题汤 Misoup 生成 ——</span>
+</footer>
+<script>
+  // 公式兜底：KaTeX 渲染失败时保留 $...$ 原样文本，不崩溃
+  function safeRenderMath() {
+    if (typeof window.renderMathInElement !== 'function') { return; }
+    var targets = document.querySelectorAll('.q-stem, .q-answer, .q-analysis, .q-option');
+    targets.forEach(function (el) {
+      var original = el.innerHTML;
+      try {
+        window.renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      } catch (e) {
+        // 兜底：还原原始文本（含 $...$），保证不崩
+        el.innerHTML = original;
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', safeRenderMath);
+  } else {
+    safeRenderMath();
+  }
+</script>
+</body>
+</html>

@@ -105,5 +105,36 @@ class ReviewViewModelTest {
         assertEquals(0, s.todayCount)
         assertEquals(0, s.stats!!.total)
         assertTrue(s.queue.isEmpty())
+        assertTrue(s.weakKps.isEmpty())
+    }
+
+    @Test
+    fun `薄弱知识点-掌握度升序top5（T06）`() = runTest {
+        // 二次函数：2 次复习 1 对 → 0.5；三角函数：2 次全对 → 1.0；数列：未复习 → 0.5
+        val r = com.misoup.app.data.model.Review("2026-08-16T10:00:00+08:00", 0)
+        val g = com.misoup.app.data.model.Review("2026-08-16T10:00:00+08:00", 2)
+        store.create(
+            makeMeta(id = "a", subject = "数学", knowledgePoints = listOf("二次函数"), reviews = listOf(r, g)),
+            img, "题干a"
+        ).getOrThrow()
+        store.create(
+            makeMeta(id = "b", subject = "数学", knowledgePoints = listOf("三角函数"), reviews = listOf(g, g)),
+            img, "题干b"
+        ).getOrThrow()
+        store.create(
+            makeMeta(id = "c", subject = "数学", knowledgePoints = listOf("数列")),
+            img, "题干c"
+        ).getOrThrow()
+
+        val v = vm()
+        v.refresh(NOW)
+        advanceUntilIdle()
+
+        val weak = v.uiState.value.weakKps
+        // 升序：0.5(数列, 复习0) → 0.5(二次函数, 复习2) → 1.0(三角函数)；复习少者同分排前
+        assertEquals(listOf("数列", "二次函数", "三角函数"), weak.map { it.knowledgePoint })
+        assertEquals(listOf("c"), weak[0].entryIds)
+        assertEquals(listOf("a"), weak[1].entryIds)
+        assertEquals(listOf("b"), weak[2].entryIds)
     }
 }

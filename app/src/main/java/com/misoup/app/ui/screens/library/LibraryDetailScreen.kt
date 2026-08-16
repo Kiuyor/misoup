@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -45,12 +47,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.misoup.app.AppGraph
+import com.misoup.app.ai.TextLlmClient
+import com.misoup.app.ai.variants.VariantGenerator
 import com.misoup.app.data.model.Subject
 import com.misoup.app.ui.library.DeleteConfirm
 import com.misoup.app.ui.library.DeleteEvent
 import com.misoup.app.ui.library.LibraryDetailViewModel
 import com.misoup.app.ui.library.OcrStatusLogic
 import com.misoup.app.ui.library.OcrStatusUi
+import com.misoup.app.ui.library.QaViewModel
+import com.misoup.app.ui.library.VariantViewModel
 import androidx.lifecycle.ViewModelProvider
 
 /**
@@ -70,6 +76,11 @@ fun LibraryDetailScreen(
     vm: LibraryDetailViewModel = viewModel(factory = detailViewModelFactory())
 ) {
     val state by vm.state.collectAsState()
+    // 模块 07：变式出题 / 题目答疑（key 含 id，每道题独立 VM 实例）
+    val variantVm: VariantViewModel = viewModel(key = "variant-$id", factory = variantViewModelFactory(id))
+    val qaVm: QaViewModel = viewModel(key = "qa-$id", factory = qaViewModelFactory(id))
+    val variantState by variantVm.state.collectAsState()
+    val qaState by qaVm.state.collectAsState()
 
     LaunchedEffect(id) { vm.load(id) }
 
@@ -193,36 +204,60 @@ fun LibraryDetailScreen(
                     }
                 }
             }
-            // 变式 / 答疑占位（M4/M5 填充）
+            // 模块 07：变式出题 / 题目答疑（M4）
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    OutlinedButton(
+                        onClick = variantVm::openDialog,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = "变式（M4 接入）",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(12.dp)
-                        )
+                        Text("变式出题")
                     }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    OutlinedButton(
+                        onClick = qaVm::open,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = "答疑（M5 接入）",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(12.dp)
-                        )
+                        Text("题目答疑")
                     }
                 }
             }
+            // 模块 07：已保存变式列表（答案可展开）
+            if (variantState.saved.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "变式练习（${variantState.saved.size} 道）",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                items(variantState.saved, key = { it.fileName }) { saved ->
+                    VariantCard(
+                        saved = saved,
+                        expanded = saved.fileName in variantState.expanded,
+                        onToggle = { variantVm.toggleExpand(saved.fileName) }
+                    )
+                }
+            }
         }
+    }
+
+    // 模块 07：变式出题弹窗（数量 1-3 → 生成 → 保存）
+    if (variantState.dialogVisible) {
+        VariantDialog(
+            state = variantState,
+            onCount = variantVm::setCount,
+            onGenerate = variantVm::generateAndSave,
+            onDismiss = variantVm::dismissDialog
+        )
+    }
+
+    // 模块 07：答疑底部弹层（消息流，会话仅内存）
+    if (qaState.sheetVisible) {
+        QaBottomSheet(
+            state = qaState,
+            onSend = qaVm::send,
+            onQuickAction = qaVm::quickAction,
+            onDismiss = qaVm::close
+        )
     }
 
     // 删除双确认（T08）
@@ -373,6 +408,42 @@ private fun detailViewModelFactory(): ViewModelProvider.Factory {
                 index = AppGraph.index,
                 store = AppGraph.store,
                 ocrRetry = AppGraph.ocrRetry
+            )
+        }
+    }
+}
+
+/** 变式出题 VM 工厂（模块 07 T03）：AppGraph 文本通道 + 存储 */
+@Composable
+private fun variantViewModelFactory(id: String): ViewModelProvider.Factory {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return viewModelFactory {
+        initializer {
+            AppGraph.init(context)
+            val store = checkNotNull(AppGraph.store) { "AppGraph 未初始化" }
+            VariantViewModel(
+                id = id,
+                generator = VariantGenerator(
+                    llm = checkNotNull(AppGraph.textLlm) { "文本 LLM 未初始化" },
+                    store = store
+                ),
+                store = store
+            )
+        }
+    }
+}
+
+/** 答疑 VM 工厂（模块 07 T04）：AppGraph 文本通道 + 存储 */
+@Composable
+private fun qaViewModelFactory(id: String): ViewModelProvider.Factory {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    return viewModelFactory {
+        initializer {
+            AppGraph.init(context)
+            QaViewModel(
+                id = id,
+                llm = checkNotNull(AppGraph.textLlm) { "文本 LLM 未初始化" },
+                store = checkNotNull(AppGraph.store) { "AppGraph 未初始化" }
             )
         }
     }

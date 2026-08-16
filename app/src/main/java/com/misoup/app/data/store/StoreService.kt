@@ -277,6 +277,72 @@ class StoreService(
         }
     }
 
+    // ---------- 模块 07 追加：变式题文件（<条目目录>/变式/yyyyMMdd_HHmmss_变式N.md） ----------
+
+    /**
+     * 保存一批变式 .md 文件（模块 07 T02）：写 <条目目录>/变式/<文件名>，原子落盘。
+     * 文件名由调用方生成（时间戳命名，同批不撞）；已存在同名 → 失败（防覆盖）。
+     */
+    suspend fun saveVariantFiles(id: String, files: Map<String, String>): Result<Unit> =
+        mutex.withLock {
+            try {
+                require(files.isNotEmpty()) { "变式文件列表为空" }
+                val entry = index.get(id)
+                    ?: throw IllegalArgumentException("条目不存在: $id")
+                val entryDir = resolveEntryDir(entry.subject, entry.dirName)
+                    ?: throw IllegalStateException("条目目录丢失: ${entry.dirName}")
+                val variantDir = File(entryDir, MisoupConfigConst.VARIANT_DIR_NAME)
+                variantDir.mkdirs()
+                files.forEach { (name, content) ->
+                    require(name.endsWith(".md")) { "变式文件名必须以 .md 结尾: $name" }
+                    val target = File(variantDir, name)
+                    check(!target.exists()) { "变式文件已存在: $name" }
+                    val tmp = File(variantDir, ".v-${System.currentTimeMillis()}-$name")
+                    try {
+                        tmp.writeText(content)
+                        atomicReplace(tmp, target)
+                    } catch (e: Throwable) {
+                        tmp.delete()
+                        throw e
+                    }
+                }
+                Result.success(Unit)
+            } catch (e: Throwable) {
+                Result.failure(e)
+            }
+        }
+
+    /** 列出条目已保存的变式文件名（名称倒序 = 最新在前）；无变式目录 → 空列表 */
+    suspend fun listVariantFiles(id: String): Result<List<String>> = mutex.withLock {
+        runCatching {
+            val entry = index.get(id)
+                ?: throw IllegalArgumentException("条目不存在: $id")
+            val dir = resolveEntryDir(entry.subject, entry.dirName)
+                ?: return@runCatching emptyList()
+            val variantDir = File(dir, MisoupConfigConst.VARIANT_DIR_NAME)
+            if (!variantDir.isDirectory) return@runCatching emptyList()
+            variantDir.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".md") }
+                ?.map { it.name }
+                ?.sortedDescending()
+                ?: emptyList()
+        }
+    }
+
+    /** 读取一个变式文件内容（列表「展开答案」用）；文件不存在 → failure */
+    suspend fun readVariantFile(id: String, fileName: String): Result<String> = mutex.withLock {
+        runCatching {
+            require(fileName.endsWith(".md")) { "变式文件名必须以 .md 结尾" }
+            val entry = index.get(id)
+                ?: throw IllegalArgumentException("条目不存在: $id")
+            val dir = resolveEntryDir(entry.subject, entry.dirName)
+                ?: throw IllegalStateException("条目目录丢失: ${entry.dirName}")
+            val f = File(File(dir, MisoupConfigConst.VARIANT_DIR_NAME), fileName)
+            if (!f.isFile) throw IllegalArgumentException("变式文件不存在: $fileName")
+            f.readText()
+        }
+    }
+
     // ---------- 内部工具 ----------
 
     /** 条目文本 + 标签重建倒排（upsert 清 token 后调用；文本缺失按空处理） */

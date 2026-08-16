@@ -18,7 +18,9 @@ import com.misoup.app.ui.screens.library.LibraryDetailScreen
 import com.misoup.app.ui.screens.library.LibraryEditScreen
 import com.misoup.app.ui.screens.review.ReviewScreen
 import com.misoup.app.ui.screens.review.ReviewCardScreen
+import com.misoup.app.ui.screens.review.KpDetailScreen
 import com.misoup.app.ui.components.MisoupBottomBar
+import com.misoup.app.ui.sync.SyncScreen
 
 /** 应用导航宿主：底部 4 tab + 错题库详情/编辑页 */
 @Composable
@@ -62,7 +64,14 @@ fun MisoupApp() {
             }
             composable("library") {
                 LibraryScreen(
-                    onOpen = { id -> navController.navigate("library/detail/${Uri.encode(id)}") }
+                    onOpen = { id -> navController.navigate("library/detail/${Uri.encode(id)}") },
+                    onExport = { navController.navigate("export") }
+                )
+            }
+            // 模块 08：导出入口（选错题 → PDF/Markdown/CSV/分享）
+            composable("export") {
+                com.misoup.app.ui.export.ExportEntryScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(
@@ -86,11 +95,32 @@ fun MisoupApp() {
                     onDone = { navController.popBackStack() }
                 )
             }
-            composable("review") { ReviewScreen(onStartRedo = { navController.navigate("review/redo") }) }
+            composable("review") {
+                ReviewScreen(
+                    onStartRedo = { navController.navigate("review/redo") },
+                    onOpenKp = { kp -> navController.navigate("review/kp/${Uri.encode(kp)}") }
+                )
+            }
+            composable(
+                route = "review/kp/{kp}",
+                arguments = listOf(navArgument("kp") { type = NavType.StringType })
+            ) { backStackEntry ->
+                KpDetailScreen(
+                    knowledgePoint = backStackEntry.arguments?.getString("kp") ?: "",
+                    onBack = { navController.popBackStack() },
+                    onOpenEntry = { id -> navController.navigate("library/detail/${Uri.encode(id)}") }
+                )
+            }
             composable("review/redo") {
                 ReviewCardScreen(onBack = { navController.popBackStack() })
             }
-            composable("mine") { MineScreen() }
+            composable("mine") {
+                MineScreen(onOpenSync = { navController.navigate("sync") })
+            }
+            // 模块 09：同步与备份设置页（WebDAV 配置/手动触发/报告）
+            composable("sync") {
+                SyncScreen(onBack = { navController.popBackStack() })
+            }
         }
     }
 }

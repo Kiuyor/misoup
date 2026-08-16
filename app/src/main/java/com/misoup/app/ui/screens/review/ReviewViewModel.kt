@@ -2,6 +2,7 @@ package com.misoup.app.ui.screens.review
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.misoup.app.ai.mastery.WeakKpAggregator
 import com.misoup.app.data.index.LibraryIndex
 import com.misoup.app.data.model.MisoupMeta
 import com.misoup.app.data.store.StoreService
@@ -16,8 +17,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * 复习 tab 总览 ViewModel（T07/T09）：
- * 今日待复习横幅 + 学情统计卡片 + 队列列表。
+ * 复习 tab 总览 ViewModel（T07/T09）：今日待复习横幅 + 学情统计卡片 + 队列列表。
+ * 模块 07 T06：薄弱知识点卡片（按掌握度升序 top5，点击进关联错题列表）。
  */
 class ReviewViewModel(
     private val queueLoader: QueueLoader,
@@ -29,6 +30,8 @@ class ReviewViewModel(
         val todayCount: Int = 0,                 // 今日待复习 N 题（横幅/角标）
         val queue: List<ReviewQueue.QueueItem> = emptyList(),
         val stats: Stats? = null,
+        /** 薄弱知识点 top5（T06：mastery 升序；点击进知识点详情） */
+        val weakKps: List<WeakKpAggregator.WeakKp> = emptyList(),
         val loading: Boolean = false,
         val error: String? = null
     )
@@ -51,12 +54,14 @@ class ReviewViewModel(
             }
             val queue = ReviewQueue.build(ReviewQueue.fromMetas(metas), now)
             val stats = StatsCalculator.calculate(metas, now)
+            val weakKps = WeakKpAggregator.topWeak(metas)
             _uiState.update {
                 it.copy(
                     loading = false,
                     todayCount = queue.size,
                     queue = queue,
-                    stats = stats
+                    stats = stats,
+                    weakKps = weakKps
                 )
             }
         }

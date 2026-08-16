@@ -15,6 +15,8 @@ dependencyResolutionManagement {
         maven { url = uri("https://maven.aliyun.com/repository/public") }
         google()
         mavenCentral()
+        // 模块 09：sardine-android 仅发布在 jitpack（com.github.thegrizzlylabs）
+        maven { url = uri("https://jitpack.io") }
     }
 }
 

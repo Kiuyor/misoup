@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,6 +67,7 @@ import androidx.lifecycle.ViewModelProvider
 @Composable
 fun LibraryScreen(
     onOpen: (String) -> Unit = {},
+    onExport: () -> Unit = {},
     vm: LibraryViewModel = viewModel(factory = libraryViewModelFactory())
 ) {
     val state by vm.uiState.collectAsState()
@@ -98,6 +100,14 @@ fun LibraryScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.weight(1f))
+            // 模块 08：导出入口（选错题 → PDF/Markdown/CSV/分享）
+            IconButton(onClick = onExport) {
+                Icon(
+                    imageVector = Icons.Filled.IosShare,
+                    contentDescription = "导出错题",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             // 视图切换（T04）
             IconButton(onClick = vm::toggleViewMode) {
                 Icon(

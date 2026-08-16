@@ -46,6 +46,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.lifecycle.ViewModelProvider
 import com.misoup.app.AppGraph
 import com.misoup.app.R
+import com.misoup.app.ai.mastery.WeakKpAggregator
 import com.misoup.app.review.queue.QueueLoader
 import com.misoup.app.review.stats.Mastery
 import com.misoup.app.review.stats.Stats
@@ -61,6 +62,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun ReviewScreen(
     onStartRedo: () -> Unit = {},
+    onOpenKp: (String) -> Unit = {},
     vm: ReviewViewModel = viewModel(factory = reviewViewModelFactory())
 ) {
     val state by vm.uiState.collectAsState()
@@ -79,6 +81,9 @@ fun ReviewScreen(
         state.stats?.let { stats ->
             item { StatsCard(stats = stats) }
         }
+
+        // ---------- 薄弱知识点卡片（T06，模块 07） ----------
+        item { WeakKpCard(weakKps = state.weakKps, onOpenKp = onOpenKp) }
 
         // ---------- 队列列表（T03 UI） ----------
         item {
@@ -336,6 +341,66 @@ private fun QueueRow(item: com.misoup.app.review.queue.ReviewQueue.QueueItem) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+/** 薄弱知识点卡片（模块 07 T06）：按掌握度升序 top5，红黄绿三档，点击进知识点详情 */
+@Composable
+private fun WeakKpCard(
+    weakKps: List<WeakKpAggregator.WeakKp>,
+    onOpenKp: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "薄弱知识点",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "掌握度升序 Top${weakKps.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (weakKps.isEmpty()) {
+                Text(
+                    "暂无知识点数据，先给错题打上知识点标签",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                weakKps.forEach { kp ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenKp(kp.knowledgePoint) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(color = Color(kp.level.color), shape = RoundedCornerShape(50))
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = kp.knowledgePoint,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "${kp.level.displayName} ${"%.0f%%".format(kp.score * 100)} · ${kp.entryIds.size} 题",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(kp.level.color)
+                        )
+                    }
+                }
+            }
         }
     }
 }

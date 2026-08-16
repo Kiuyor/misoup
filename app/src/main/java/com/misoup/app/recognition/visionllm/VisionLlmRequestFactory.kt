@@ -77,7 +77,13 @@ object VisionLlmRequestFactory {
         )
 
     /** 连通测试请求体（T04）：1 次最小纯文本请求，不含图片 */
-    fun buildPingBody(model: String): String =
+    fun buildPingBody(model: String): String = buildTextBody(PING_TEXT, model)
+
+    /**
+     * 纯文本 chat 请求体（模块 07 T01 变式/答疑共用；无图片）：
+     * messages[0] = {role:user, content:"<prompt>"}，与 [buildPingBody] 同构。
+     */
+    fun buildTextBody(prompt: String, model: String): String =
         json.encodeToString(
             JsonObject.serializer(),
             buildJsonObject {
@@ -88,7 +94,7 @@ object VisionLlmRequestFactory {
                         add(
                             buildJsonObject {
                                 put("role", "user")
-                                put("content", PING_TEXT)
+                                put("content", prompt)
                             }
                         )
                     }

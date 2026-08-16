@@ -76,6 +76,9 @@ dependencies {
     // 识别相关：离线 OCR（模块 04）= onnxruntime-android；JVM 单测仅覆盖纯逻辑，
     // ONNX 推理（OrtSession）依赖 Android 环境，需模拟器/真机验证
     implementation(libs.onnxruntime.android)
+    // 模块 09：WebDAV 双向同步（坚果云等，无账号体系）；网络交互抽象在 DavClient 接口后，
+    // 生产实现 SardineDavClient 走 sardine-android，JVM 单测注入 fake 客户端覆盖纯逻辑
+    implementation(libs.sardine.android)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 

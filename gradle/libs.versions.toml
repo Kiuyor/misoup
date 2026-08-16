@@ -16,6 +16,7 @@ opencv = "4.10.0"
 onnxruntime = "1.20.0"
 camera = "1.6.1"
 junit = "4.13.2"
+sardineAndroid = "0.9"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -43,6 +44,8 @@ camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.r
 camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camera" }
 camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camera" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+# 模块 09：WebDAV 同步（坚果云等，jitpack 发布；依赖 okhttp + simple-xml）
+sardine-android = { group = "com.github.thegrizzlylabs", name = "sardine-android", version.ref = "sardineAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

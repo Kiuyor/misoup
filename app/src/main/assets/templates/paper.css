@@ -1,0 +1,176 @@
+/* 错题汤 Misoup · PDF 试卷模板样式
+ * A4 纸面、页边距 15mm；题号 + 科目/日期头；每题卡片；答题留白 60mm
+ * 两种模式：.mode-redo（重做卷：无答案/解析，留作答区）
+ *           .mode-answer（答案卷：含答案+解析，答案区浅色底）
+ */
+@page {
+  size: A4;
+  margin: 15mm;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", "Songti SC", serif;
+  font-size: 11pt;
+  line-height: 1.6;
+}
+
+/* ---------- 页头 ---------- */
+.paper-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid #333;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+.paper-title {
+  font-size: 16pt;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  letter-spacing: 2px;
+}
+
+.paper-meta .meta-item {
+  margin-right: 14px;
+  font-size: 10.5pt;
+  color: #444;
+}
+
+.head-right {
+  text-align: right;
+  font-size: 10.5pt;
+  line-height: 1.8;
+  color: #333;
+}
+
+/* ---------- 题目卡片 ---------- */
+.question {
+  page-break-inside: avoid;
+  border: 1px solid #d0d0d0;
+  border-left: 4px solid #2c6fbb;
+  border-radius: 4px;
+  padding: 8px 12px 10px 12px;
+  margin-bottom: 10px;
+  background: #ffffff;
+}
+
+.q-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px dashed #bbb;
+  padding-bottom: 3px;
+  margin-bottom: 6px;
+}
+
+.q-no {
+  font-weight: 700;
+  font-size: 12pt;
+  color: #2c6fbb;
+}
+
+.q-meta {
+  font-size: 9.5pt;
+  color: #666;
+}
+.q-meta .tag {
+  margin-left: 8px;
+  background: #eef3fa;
+  border-radius: 3px;
+  padding: 0 5px;
+  color: #2c6fbb;
+}
+
+.q-stem {
+  margin: 0 0 6px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.q-options {
+  margin: 0 0 6px 6px;
+}
+.q-option {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.q-images {
+  margin: 6px 0;
+}
+.q-images img {
+  max-width: 100%;
+  max-height: 70mm;
+  object-fit: contain;
+}
+
+/* ---------- 答案区 ---------- */
+.q-answer,
+.q-analysis {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 10.5pt;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.q-answer-label,
+.q-analysis-label {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* ---------- 模式：答案卷（答案区浅色底） ---------- */
+.mode-answer .q-answer {
+  background: #eef7ee;
+  border-left: 3px solid #3a8f3a;
+}
+.mode-answer .q-analysis {
+  background: #f5f2ea;
+  border-left: 3px solid #b08a3a;
+}
+.mode-answer .answer-space {
+  display: none;
+}
+
+/* ---------- 模式：重做卷（留作答区，隐藏答案/解析） ---------- */
+.mode-redo .q-answer,
+.mode-redo .q-analysis {
+  display: none;
+}
+
+.answer-space {
+  height: 60mm; /* 答题留白 60mm */
+  margin-top: 8px;
+  border-top: 1px dashed #ccc;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 9.5mm,
+    #ddd 9.5mm,
+    #ddd calc(9.5mm + 1px)
+  );
+}
+
+/* 分页控制：避免头部与题目分离 */
+.paper-foot {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 9pt;
+  color: #999;
+  border-top: 1px solid #ddd;
+  padding-top: 4px;
+}
+
+/* KaTeX 溢出保护 */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}

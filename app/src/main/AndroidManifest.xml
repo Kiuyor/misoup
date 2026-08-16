@@ -19,6 +19,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 模块 08 T07：系统分享 FileProvider（authority 定稿 com.misoup.app.fileprovider） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.misoup.app.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
