@@ -74,9 +74,7 @@ class RecognitionQueue<T>(
     fun start() {
         if (worker?.isActive == true) return
         worker = scope.launch {
-            println("DIAG worker started")
             for (job in jobs) {
-                println("DIAG worker got job ${job.id}")
                 // 单条异常不杀循环：识别器/回写任一失败都仅影响本条
                 runCatching { process(job) }
             }
@@ -97,12 +95,15 @@ class RecognitionQueue<T>(
     }
 
     /**
-     * 识别失败重试：命中失败缓存（[failedJobs]）才生效——只重试「已落库但识别失败」的条目；
-     * 收录阶段失败的图片无 metaId 不可重试（静默无操作）。
+     * 识别失败重试：命中失败缓存（[failedJobs]）才生效——只重试「已落库但识别失败」的条目。
+     *
+     * @return true = 已重新入队；false = 缓存未命中（进程重启后失败位图已丢失）。
+     * 未命中时由调用方（CaptureCoordinator）从磁盘重载原图重新入队（F6）。
      */
-    fun retry(id: String) {
-        val cached = failedJobs[id] ?: return
+    fun retry(id: String): Boolean {
+        val cached = failedJobs[id] ?: return false
         enqueue(cached.copy(attempt = cached.attempt + 1))
+        return true
     }
 
     /** 处理单条任务：识别 → 回写 → 状态流转 */
@@ -122,7 +123,12 @@ class RecognitionQueue<T>(
     /** 识别成功回写：文本.md + meta.ocr.status=done + 倒排刷新（T09 文档约定） */
     private suspend fun writeBackSuccess(id: String, text: String?) {
         if (!text.isNullOrBlank()) {
-            store.updateText(id, text)   // 写 文本.md + 倒排刷新（indexText）+ mtime touch
+            // F4 修复：用户已在识别窗口内手动编辑过 文本.md → 跳过覆盖，尊重用户输入；
+            // 读取失败（文件不可读等）也跳过覆盖（保守，不丢用户数据）。
+            val existing = store.readTextById(id).getOrNull()
+            if (existing == null || existing.isBlank()) {
+                store.updateText(id, text)   // 写 文本.md + 倒排刷新（indexText）+ mtime touch
+            }
         }
         store.update(id) { meta ->
             meta.copy(ocr = meta.ocr.copy(status = "done", at = clock()))

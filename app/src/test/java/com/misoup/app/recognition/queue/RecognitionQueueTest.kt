@@ -164,6 +164,38 @@ class RecognitionQueueTest {
         queue.stop()
     }
 
+    // ---------- F4 回归：识别回写不覆盖用户手动编辑 ----------
+
+    @Test
+    fun `F4回归-识别完成不覆盖用户已编辑的文本`() = runTest {
+        val recognizer = Recognizer<String> { Result.success("OCR识别结果文本") }
+        val queue = RecognitionQueue(store, index, recognizer, this, clock)
+
+        val id = createCard()
+        // 用户在识别窗口内手动编辑并保存了文本.md
+        store.updateText(id, "## 题干\n用户手写题干").getOrThrow()
+        queue.enqueue(RecognitionQueue.JobSpec(id, "enhanced:1"))
+        awaitPhase(queue, id, RecognitionPhase.DONE)
+
+        // 用户文本保留（不被 OCR 覆盖）；ocr 状态照常回写 done
+        assertEquals("## 题干\n用户手写题干", store.readTextById(id).getOrThrow())
+        assertEquals("done", store.readMetaById(id).getOrThrow().ocr.status)
+        queue.stop()
+    }
+
+    @Test
+    fun `F4回归-文本为空时识别回写正常落盘`() = runTest {
+        val recognizer = Recognizer<String> { Result.success("OCR识别结果文本") }
+        val queue = RecognitionQueue(store, index, recognizer, this, clock)
+
+        val id = createCard()   // create(text=null) → 无文本.md（空）
+        queue.enqueue(RecognitionQueue.JobSpec(id, "enhanced:1"))
+        awaitPhase(queue, id, RecognitionPhase.DONE)
+
+        assertEquals("OCR识别结果文本", store.readTextById(id).getOrThrow())
+        queue.stop()
+    }
+
     // ---------- 串行性 ----------
 
     @Test

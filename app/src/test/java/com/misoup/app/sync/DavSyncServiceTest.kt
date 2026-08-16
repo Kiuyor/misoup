@@ -359,4 +359,70 @@ class DavSyncServiceTest {
         assertTrue(report.isSuccess)
         assertEquals(1, report.uploaded)
     }
+
+    // ---------- F1 回归：传输失败不污染快照（防止下次同步方向反转覆盖） ----------
+
+    @Test
+    fun `上传失败 - 失败条目不进状态快照 重试方向仍为上传不下载覆盖`() = runTest {
+        putLocalEntry("数学", "A", text = "本地旧版")
+        service.syncFull()   // 基线：远端 = 本地旧版
+        // 本地修改 → 新版本；上传失败
+        File(localDir("数学", "A"), MisoupConfigConst.TEXT_FILE_NAME).writeText("本地新版")
+        client.failUpload = true
+        val first = service.syncIncremental()
+        assertFalse(first.isSuccess)
+        assertTrue(first.errors.any { it.contains("上传失败") })
+        // 失败条目不进状态快照：即使状态文件写失败（旧快照留存），
+        // 快照指纹也绝不能是「本地新版本」（否则下次误判本地未变 → 下载旧版覆盖）
+        val stateAfterFail = remoteState()
+        val localFp = LocalScanner.entryFingerprints(index, libraryRoot)["数学/A"]
+        if (stateAfterFail != null && localFp != null) {
+            val snap = stateAfterFail.entries["数学/A"]
+            assertFalse(
+                "失败条目的快照指纹被更新为本地新版本",
+                snap != null && snap.mtime == localFp.mtime && snap.size == localFp.size
+            )
+        }
+
+        // 网络恢复重试：方向仍为上传（本地较新冲突裁决），绝不下载远端旧版覆盖本地新版
+        client.failUpload = false
+        val second = service.syncIncremental()
+        assertTrue(second.isSuccess)
+        assertEquals(0, second.downloaded)
+        assertEquals("本地新版", client.fileContent("数学/A/文本.md"))
+        assertTrue(second.uploaded > 0 || second.conflicts > 0)
+    }
+
+    @Test
+    fun `下载失败 - 失败条目不进状态快照 重试方向仍为下载不上传覆盖`() = runTest {
+        putLocalEntry("数学", "A", text = "本地旧版")
+        service.syncFull()   // 基线
+        // 另一设备改远端 → 新版本；下载失败
+        client.putFile("数学/A/文本.md", "远端新版")
+        client.failDownload = true
+        val first = service.syncIncremental()
+        assertFalse(first.isSuccess)
+        // failDownload 同时使状态文件读取失败 → 无快照 → 走冲突路径（"冲突处理失败"），
+        // 或直连下载失败（"下载失败"）；两者都是失败记录，核心是失败条目不进快照
+        assertTrue(first.errors.isNotEmpty())
+        // 失败条目不进状态快照：即使状态文件写失败（旧快照留存），
+        // 快照指纹也绝不能是「远端新版本」（否则下次误判远端未变 → 上传旧版覆盖）
+        val stateAfterFail = remoteState()
+        val remoteFp = RemoteScanner.entryFingerprints(client.listRecursive(FakeDavClient.ROOT))["数学/A"]
+        if (stateAfterFail != null && remoteFp != null) {
+            val snap = stateAfterFail.entries["数学/A"]
+            assertFalse(
+                "失败条目的快照指纹被更新为远端新版本",
+                snap != null && snap.mtime == remoteFp.mtime && snap.size == remoteFp.size
+            )
+        }
+
+        // 网络恢复重试：方向仍为下载（远端较新冲突裁决），绝不把本地旧版上传覆盖远端新版
+        client.failDownload = false
+        val second = service.syncIncremental()
+        assertTrue(second.isSuccess)
+        assertEquals(0, second.uploaded)
+        assertEquals("远端新版", File(localDir("数学", "A"), "文本.md").readText())
+        assertTrue(second.downloaded > 0 || second.conflicts > 0)
+    }
 }

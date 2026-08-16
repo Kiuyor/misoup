@@ -39,40 +39,47 @@ class ReviewSubmitter(
      * @return 成功 → [SubmitResult]；失败 → 原因（条目不存在/meta 损坏/写盘失败）
      */
     suspend fun submit(id: String, grade: Int, now: Long, params: Fsrs.Params = Fsrs.Params()): Result<SubmitResult> {
-        val meta = store.readMetaById(id).getOrElse { return Result.failure(it) }
-        val card = toCard(meta)
-
-        val next = Fsrs.review(card, grade, params, now)
-        val intervalDays = (next.due - now).toDouble() / Fsrs.DAY_MS
         val rating = (grade.takeIf { it in 1..4 } ?: 1) - 1   // grade 1-4 → rating 0-3
-
-        val newFsrs = FsrsState(
-            state = next.state,
-            due = FsrsTime.toIso(next.due),
-            stability = next.stability,
-            difficulty = next.difficulty,
-            reps = next.reps,
-            lapses = next.lapses,
-            lastReview = FsrsTime.toIso(now)
-        )
-        val review = Review(
-            date = FsrsTime.toIso(now) ?: return Result.failure(IllegalStateException("时间转换失败")),
-            rating = rating,
-            stateAfter = next.state,
-            intervalDays = intervalDays
-        )
-
-        return store.update(id) { it.copy(fsrs = newFsrs, reviews = it.reviews + review) }
-            .map {
-                SubmitResult(
-                    meta = store.readMetaById(id).getOrThrow(),   // 读回磁盘最新（含更新后）
-                    stateAfter = next.state,
-                    intervalDays = intervalDays,
-                    newDueEpochMs = next.due,
-                    rating = rating
-                )
-            }
+        // F8：读改写原子化——FSRS 计算在 update 的 transform 内完成（基于锁内读到的当前 meta），
+        // 并发提交（连点/多端同时复习）时后写基于前写结果，fsrs 与 reviews 永不脱节。
+        return store.update(id) { current ->
+            val card = toCard(current)
+            val next = Fsrs.review(card, grade, params, now)
+            current.copy(
+                fsrs = fsrsOf(next, now),
+                reviews = current.reviews + reviewOf(next, now, rating)
+            )
+        }.map {
+            val meta = store.readMetaById(id).getOrThrow()   // 读回磁盘最新（含更新后）
+            val dueMs = FsrsTime.toEpochMs(meta.fsrs.due) ?: now
+            SubmitResult(
+                meta = meta,
+                stateAfter = meta.fsrs.state,
+                intervalDays = (dueMs - now).toDouble() / Fsrs.DAY_MS,
+                newDueEpochMs = dueMs,
+                rating = rating
+            )
+        }
     }
+
+    /** FSRS 计算后状态 → meta.fsrs 字段 */
+    private fun fsrsOf(next: Fsrs.Card, now: Long): FsrsState = FsrsState(
+        state = next.state,
+        due = FsrsTime.toIso(next.due),
+        stability = next.stability,
+        difficulty = next.difficulty,
+        reps = next.reps,
+        lapses = next.lapses,
+        lastReview = FsrsTime.toIso(now)
+    )
+
+    /** FSRS 计算后 → 单条复习记录 */
+    private fun reviewOf(next: Fsrs.Card, now: Long, rating: Int): Review = Review(
+        date = FsrsTime.toIso(now) ?: "",
+        rating = rating,
+        stateAfter = next.state,
+        intervalDays = (next.due - now).toDouble() / Fsrs.DAY_MS
+    )
 
     /** meta.fsrs → Fsrs.Card（due/lastReview 字符串 → epoch；解析失败按新卡兜底） */
     private fun toCard(meta: MisoupMeta): Fsrs.Card {

@@ -43,7 +43,11 @@ data class Filter(
  * - entries: id → IndexedEntry
  * - inverted: 分词 token → id 集合（题干文本 OCR 结果，识别完成后填充）
  *
- * 线程模型：由 StoreService（Mutex 串行）调用写操作；rebuild 在启动时单线程执行。
+ * 线程模型（F3 修复）：全部公开方法 @Synchronized（对象监视器锁）。
+ * 写方来自 StoreService（协程 Mutex 串行）与 DavSyncService（同步直接调用，Main 线程），
+ * 读方来自 UI 查询——多线程并发访问 LinkedHashMap/HashMap 必须互斥，
+ * 否则数据竞态导致索引条目丢失/倒排错乱/ConcurrentModificationException。
+ * 锁粒度毫秒级，1 万题量级无感知。
  */
 class LibraryIndex {
 
@@ -59,6 +63,7 @@ class LibraryIndex {
      *
      * @param thumbDir 缩略图目录（cacheDir/thumbs），仅用于探测已生成的缩略图；null 则 thumbPath 为空
      */
+    @Synchronized
     fun rebuild(root: File, thumbDir: File? = null) {
         entries.clear()
         inverted.clear()
@@ -112,6 +117,7 @@ class LibraryIndex {
     }
 
     /** 新增/覆盖正常条目（dirName 为空时沿用旧条目目录名，兜底用 meta.id） */
+    @Synchronized
     fun upsert(
         meta: MisoupMeta,
         thumb: String?,
@@ -143,6 +149,7 @@ class LibraryIndex {
     }
 
     /** 新增"待修复"条目（损坏容错，T10） */
+    @Synchronized
     fun upsertRepair(dirName: String, subject: String, mtime: Long, repairJson: String?) {
         val id = "repair:$subject:$dirName"
         entries[id] = IndexedEntry(
@@ -164,12 +171,14 @@ class LibraryIndex {
     }
 
     /** 删除条目（含其倒排） */
+    @Synchronized
     fun remove(id: String) {
         entries.remove(id)
         clearTokens(id)
     }
 
     /** 题干文本分词 → 倒排（识别完成后填充；覆盖式：先清旧 token） */
+    @Synchronized
     fun indexText(id: String, text: String) {
         if (!entries.containsKey(id)) return
         clearTokens(id)
@@ -184,6 +193,7 @@ class LibraryIndex {
      * 标签分词 → 倒排（T03 关键词搜索命中标签）。
      * 追加式：与 [indexText] 的题干 token 并存，token 汇总进 idTokens 便于清理。
      */
+    @Synchronized
     fun indexTags(id: String, tags: List<String>) {
         if (!entries.containsKey(id)) return
         val tokens = tags.flatMap { TextTokenizer.tokenize(it) }
@@ -206,6 +216,7 @@ class LibraryIndex {
      * keyword 为 null/空白时仅按 Filter 过滤。
      * 结果按 mtime 降序（最近更新的在前）。
      */
+    @Synchronized
     fun query(filter: Filter, keyword: String?): List<IndexedEntry> {
         var result = entries.values.filter { entry ->
             (filter.subjects.isEmpty() || entry.subject in filter.subjects) &&
@@ -226,21 +237,27 @@ class LibraryIndex {
     }
 
     /** 全部条目（含待修复） */
+    @Synchronized
     fun all(): List<IndexedEntry> = entries.values.toList()
 
+    @Synchronized
     fun get(id: String): IndexedEntry? = entries[id]
 
+    @Synchronized
     fun size(): Int = entries.size
 
     /** 刷新条目 mtime（列表按最近编辑排序；文本更新/重命名后调用） */
+    @Synchronized
     fun touch(id: String, mtime: Long = System.currentTimeMillis()) {
         val e = entries[id] ?: return
         entries[id] = e.copy(mtime = mtime)
     }
 
     /** 科目 → 条目数（学情统计/分组用） */
+    @Synchronized
     fun countBySubject(): Map<String, Int> = entries.values.groupingBy { it.subject }.eachCount()
 
     /** 全部倒排 token（调试/测试用） */
+    @Synchronized
     fun tokenCount(): Int = inverted.size
 }

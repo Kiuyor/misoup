@@ -89,6 +89,13 @@ fun DataSettingsScreen(
                     ) { Text("选择新目录（SAF 迁移）") }
                 }
             }
+            // F9：数据安全提示——默认目录随应用卸载清除，用户必须知情
+            Text(
+                "提示：错题数据默认保存在应用专属目录，卸载应用或清除数据会清空错题库。" +
+                    "建议定期「备份」，或开启 WebDAV 同步、将库迁移到外部目录。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             // ---- WebDAV ----
             Card(modifier = Modifier.fillMaxWidth()) {

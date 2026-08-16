@@ -65,7 +65,9 @@ class SyncViewModelTest {
         syncAction = {
             syncCalls++
             syncResults.removeFirstOrNull() ?: SyncReport()
-        }
+        },
+        // F5：测试注入测试调度器，保证 runCurrent 同步推进（生产用 Dispatchers.IO）
+        ioDispatcher = dispatcher
     )
 
     private fun okReport() = SyncReport(uploaded = 3, downloaded = 1)
@@ -248,7 +250,7 @@ class SyncViewModelTest {
 
     @Test
     fun `自定义退避序列生效`() {
-        val v = SyncViewModel(repo, { failReport() }, SyncBackoff(listOf(1_000L, 2_000L)))
+        val v = SyncViewModel(repo, { failReport() }, SyncBackoff(listOf(1_000L, 2_000L)), ioDispatcher = dispatcher)
         v.syncNow()
         dispatcher.scheduler.runCurrent()
         assertEquals(1_000L, v.state.value.retryInMs)

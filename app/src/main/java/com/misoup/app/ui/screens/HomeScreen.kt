@@ -30,13 +30,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -66,6 +70,17 @@ fun HomeScreen(
     vm: HomeBadgeViewModel = viewModel(factory = homeBadgeViewModelFactory())
 ) {
     val badge by vm.todayCount.collectAsState()
+
+    // F7：每次回到首页（ON_RESUME）刷新今日待复习角标——
+    // 录入新题/完成复习后返回首页不再显示旧值（VM 常驻 backstack 底部，init 只加载一次）
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // T01 Photo Picker：单张=单题（maxItems=1），多选=批量（maxItems=50）
     val picker = rememberLauncherForActivityResult(

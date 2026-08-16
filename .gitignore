@@ -24,3 +24,7 @@ hs_err_pid*
 # Signing (never commit keystores)
 *.jks
 *.keystore
+
+# Build artifacts
+*.apk
+*.aab

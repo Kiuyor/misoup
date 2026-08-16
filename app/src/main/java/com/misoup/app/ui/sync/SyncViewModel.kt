@@ -7,12 +7,15 @@ import com.misoup.app.sync.SyncBackoff
 import com.misoup.app.sync.SyncReport
 import com.misoup.app.sync.webdav.DavConfig
 import com.misoup.app.sync.webdav.DavCredentialRepository
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** 同步设置页 UI 状态（模块 09 T05） */
 data class SyncUiState(
@@ -40,7 +43,9 @@ data class SyncUiState(
 class SyncViewModel(
     private val credRepo: DavCredentialRepository,
     private val syncAction: suspend () -> SyncReport,
-    private val backoff: SyncBackoff = SyncBackoff()
+    private val backoff: SyncBackoff = SyncBackoff(),
+    private val autoSyncStore: AutoSyncStore = MemAutoSyncStore(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SyncUiState())
@@ -59,6 +64,7 @@ class SyncViewModel(
         _state.value = _state.value.copy(
             config = cfg,
             isConfigured = credRepo.isConfigured,
+            autoSync = autoSyncStore.enabled,   // 开关持久化读回（F2）
             message = if (cfg.url.isNotBlank() && !cfg.isHttps) {
                 "⚠ WebDAV 仅支持 HTTPS：当前 http 地址将被拒绝连接"
             } else {
@@ -100,7 +106,8 @@ class SyncViewModel(
         syncJob?.cancel()
         syncJob = viewModelScope.launch {
             _state.value = _state.value.copy(syncing = true, message = null)
-            val report = syncAction()
+            // F5：同步整体切 IO 线程（磁盘扫描/目录删除/串行网络不得阻塞主线程）
+            val report = withContext(ioDispatcher) { syncAction() }
             if (report.isSuccess) {
                 _state.value = _state.value.copy(
                     syncing = false,
@@ -134,8 +141,9 @@ class SyncViewModel(
         }
     }
 
-    /** 录入后自动同步开关（默认关） */
+    /** 录入后自动同步开关（默认关）；持久化（F2），录入完成后由进度页触发同步 */
     fun setAutoSync(enabled: Boolean) {
+        autoSyncStore.enabled = enabled
         _state.value = _state.value.copy(autoSync = enabled)
     }
 

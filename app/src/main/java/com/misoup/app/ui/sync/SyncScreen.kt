@@ -177,7 +177,8 @@ private fun syncViewModelFactory(): ViewModelProvider.Factory {
             AppGraph.init(context)
             SyncViewModel(
                 credRepo = AppGraph.syncCredentialRepo,
-                syncAction = { AppGraph.syncService.syncIncremental() }
+                syncAction = { AppGraph.syncService.syncIncremental() },
+                autoSyncStore = PrefsAutoSyncStore(context)
             )
         }
     }

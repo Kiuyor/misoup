@@ -40,11 +40,35 @@ class SardineDavClient(
     }
 
     override suspend fun download(remotePath: String, target: File): Boolean {
-        sardine.get(remotePath).use { input ->
+        // 原子下载：先写同目录临时文件（点开头，扫描器/同步器忽略），成功后原子替换目标。
+        // 中断/失败时目标文件保持原状，杜绝半写文件污染条目（F1）。
+        val tmp = File(target.parentFile, ".${target.name}.d-${System.currentTimeMillis()}.tmp")
+        try {
             target.parentFile?.mkdirs()
-            target.outputStream().use { output -> input.copyTo(output) }
+            sardine.get(remotePath).use { input ->
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            }
+            atomicReplace(tmp, target)
+            return true
+        } catch (e: Exception) {
+            tmp.delete()
+            throw e
         }
-        return true
+    }
+
+    /** 原子替换文件：优先 ATOMIC_MOVE（同卷），不支持则 REPLACE_EXISTING 兜底 */
+    private fun atomicReplace(source: File, target: File) {
+        val src = source.toPath()
+        val dst = target.toPath()
+        try {
+            java.nio.file.Files.move(
+                src, dst,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE
+            )
+        } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
+            java.nio.file.Files.move(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     override suspend fun delete(remotePath: String): Boolean {

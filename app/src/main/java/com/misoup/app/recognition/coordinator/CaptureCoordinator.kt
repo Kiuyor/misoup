@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 
 /**
  * T08 采集协调器：逐张 加载 → 预处理 → 落库(ocr=pending) → 入识别队列
@@ -42,7 +43,7 @@ class CaptureCoordinator<T>(
     recognizer: Recognizer<T>,
     private val loader: CaptureImageLoader<T>,
     private val preprocess: PreprocessRunner<T>,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val assetFactory: (T, ImageFormat) -> ImageAsset,
     private val clock: () -> String = { com.misoup.app.review.fsrs.FsrsTime.toIso(System.currentTimeMillis()) ?: "" },
     private val defaultSubject: String = CaptureDefaults.DEFAULT_SUBJECT
@@ -104,9 +105,19 @@ class CaptureCoordinator<T>(
         meta.id
     }.getOrNull()
 
-    /** 识别失败重试（T09 队列重试；失败位图缓存命中才生效） */
+    /**
+     * 识别失败重试（T09 队列重试；失败位图缓存命中才生效）。
+     * F6：进程重启后内存缓存丢失 → 从磁盘重载条目原图，重新走预处理并入队，
+     * 「识别失败」条目的重试按钮不再静默失效。
+     */
     fun retry(id: String) {
-        queue.retry(id)
+        if (queue.retry(id)) return
+        scope.launch {
+            val path = store.imagePathById(id).getOrNull() ?: return@launch
+            val bitmap = loader.load(CaptureSource("file://$path")) ?: return@launch
+            val result = preprocess.run(bitmap)
+            queue.enqueue(RecognitionQueue.JobSpec(id, result.enhanced))
+        }
     }
 
     /** 停止识别队列 worker（测试收尾/界面销毁时调用；幂等） */

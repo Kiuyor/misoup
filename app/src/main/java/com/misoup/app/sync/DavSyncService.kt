@@ -69,30 +69,35 @@ class DavSyncService(
         var downloaded = 0
         var conflicts = 0
         var deleted = 0
+        // 本次同步成功处理的条目路径（上传/下载/冲突/删除传播成功者）。
+        // 失败条目从新快照剔除 → 下次对它们按「无快照」保守裁决（上传/下载方向由 mtime 冲突裁决），
+        // 杜绝「传输失败却记为已同步」导致下次同步方向反转、旧版本覆盖新版本（F1）。
+        val okPaths = HashSet<String>()
 
         for (action in plan.actions) {
             when (action) {
                 is SyncDiff.Action.Upload -> {
                     val ok = uploadEntry(root, action.path)
-                    if (ok) uploaded++ else errors += "上传失败: ${action.path}"
+                    if (ok) { uploaded++; okPaths += action.path } else errors += "上传失败: ${action.path}"
                 }
                 is SyncDiff.Action.Download -> {
                     val ok = downloadEntry(root, action.path)
-                    if (ok) downloaded++ else errors += "下载失败: ${action.path}"
+                    if (ok) { downloaded++; okPaths += action.path } else errors += "下载失败: ${action.path}"
                 }
                 is SyncDiff.Action.Conflict -> {
                     val ok = resolveConflict(root, action)
-                    if (ok) conflicts++ else errors += "冲突处理失败: ${action.path}"
+                    if (ok) { conflicts++; okPaths += action.path } else errors += "冲突处理失败: ${action.path}"
                 }
                 is SyncDiff.Action.DeleteRemote -> {
                     val ok = runCatching { client.delete("$root/${action.path}") }.getOrDefault(false)
-                    if (ok) deleted++ else errors += "远端删除失败: ${action.path}"
+                    if (ok) { deleted++; okPaths += action.path } else errors += "远端删除失败: ${action.path}"
                 }
                 is SyncDiff.Action.DeleteLocal -> {
                     val dir = LocalScanner.resolveEntryDir(libraryRoot, action.path)
                     val ok = dir != null && dir.deleteRecursively()
                     if (ok) {
                         deleted++
+                        okPaths += action.path
                         // 索引同步移除（否则本会话内列表残留；重启 rebuild 也会清理）
                         val parts = action.path.split('/')
                         index.all().firstOrNull { it.subject == parts[0] && it.dirName == parts[1] }
@@ -105,15 +110,31 @@ class DavSyncService(
             }
         }
 
-        // 回写同步状态（失败不致命：下次同步按无快照保守裁决）
-        // 快照 = 所有仍存活条目（上传/下载/冲突/跳过）的最新指纹；被删除条目剔除，
-        // 否则跳过条目的快照丢失会导致下次同步误判「双端都变」产生假冲突
+        // 回写同步状态：快照只收录「本次同步后双端一致」的存活条目。
+        // - 被删除条目剔除（删除传播后已不存在）
+        // - 传输/冲突失败的条目剔除（下次按无快照保守裁决，不误判「未变」）
+        // - 跳过的条目保留（否则下次同步误判「双端都变」产生假冲突）
         val deletedPaths = plan.actions
             .filterIsInstance<SyncDiff.Action.DeleteLocal>()
             .map { it.path } +
             plan.actions.filterIsInstance<SyncDiff.Action.DeleteRemote>().map { it.path }
+        val failedPaths = plan.actions
+            .filterNot { it is SyncDiff.Action.DropState }
+            .mapNotNull { action ->
+                val p = when (action) {
+                    is SyncDiff.Action.Upload -> action.path
+                    is SyncDiff.Action.Download -> action.path
+                    is SyncDiff.Action.Conflict -> action.path
+                    is SyncDiff.Action.DeleteRemote -> action.path
+                    is SyncDiff.Action.DeleteLocal -> action.path
+                    is SyncDiff.Action.DropState -> null
+                }
+                p?.takeIf { it !in okPaths }
+            }
+            .toSet()
+        val excluded = deletedPaths.toSet() + failedPaths
         val entries = (localEntries.keys + remoteEntries.keys)
-            .filterNot { it in deletedPaths }
+            .filterNot { it in excluded }
             .mapNotNull { path ->
                 val l = localEntries[path]
                 val r = remoteEntries[path]
