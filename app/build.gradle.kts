@@ -73,7 +73,9 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
 
-    // 识别相关：onnxruntime-android 由模块 05 引入，避免骨架 APK 体积膨胀
+    // 识别相关：离线 OCR（模块 04）= onnxruntime-android；JVM 单测仅覆盖纯逻辑，
+    // ONNX 推理（OrtSession）依赖 Android 环境，需模拟器/真机验证
+    implementation(libs.onnxruntime.android)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 

@@ -9,8 +9,9 @@ import com.misoup.app.data.store.StoreService
 import com.misoup.app.data.store.ThumbService
 import com.misoup.app.data.store.WebpImageEncoder
 import com.misoup.app.pipeline.PreprocessPipeline
-import com.misoup.app.recognition.DummyRecognizer
 import com.misoup.app.recognition.coordinator.CaptureCoordinator
+import com.misoup.app.recognition.paddle.PaddleOcrEngine
+import com.misoup.app.recognition.paddle.PaddleOcrRecognizer
 import com.misoup.app.ui.capture.AndroidImageLoader
 import com.misoup.app.ui.library.OcrRetryHandler
 import java.io.File
@@ -23,7 +24,7 @@ import kotlinx.coroutines.SupervisorJob
  *
  * - 启动时构建 StoreService + 重建索引（一次性）
  * - [captureCoordinator]：T08 采集协调器（落库 + 识别队列）；
- *   识别引擎暂用 [DummyRecognizer]（T09 状态流转先行，模块 05 接入真实 OCR）
+ *   识别引擎 = 模块 04 PaddleOCR（离线 ONNX；模型缺失时返回明确错误 → 队列标记 failed 可重试）
  * - [ocrRetry]：T10 识别重试入口 = CaptureCoordinator.retry（详情页/列表页共用）
  */
 object AppGraph {
@@ -62,11 +63,11 @@ object AppGraph {
         store = StoreService(root, index, encoder, ThumbService(appContext.cacheDir, encoder))
         // 启动扫描：<root>/<科目>/<条目目录>/meta.json → 内存索引 + 缩略图探测
         index.rebuild(root, File(appContext.cacheDir, "thumbs"))
-        // 模块 01：采集协调器（识别引擎占位 → 模块 05 替换 DummyRecognizer）
+        // 模块 01：采集协调器（识别引擎 = 模块 04 PaddleOCR；模型缺失 → 明确错误 → failed 可重试）
         captureCoordinator = CaptureCoordinator(
             store = store!!,
             index = index,
-            recognizer = DummyRecognizer(),
+            recognizer = PaddleOcrRecognizer(PaddleOcrEngine(appContext)),
             loader = AndroidImageLoader(appContext),
             preprocess = RealPreprocessRunner,
             scope = captureScope,
