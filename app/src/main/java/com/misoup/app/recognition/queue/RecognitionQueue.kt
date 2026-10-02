@@ -92,7 +92,12 @@ class RecognitionQueue<T>(
 
     /** 提交识别任务；立即置 PENDING（UI 即时反馈），worker 惰性启动 */
     fun enqueue(job: JobSpec<T>) {
-        _status.update { it + (job.id to RecognitionStatus(RecognitionPhase.PENDING)) }
+        // 清单 #16：条目被删除后无删除通知钩子，入队时顺带清理索引中已不存在的条目状态，
+        // 防进度页/列表徽标残留已删除条目的 PENDING/FAILED
+        _status.update { map ->
+            map.filterKeys { id -> id == job.id || index.get(id) != null } +
+                (job.id to RecognitionStatus(RecognitionPhase.PENDING))
+        }
         start()
         jobs.trySend(job)
     }

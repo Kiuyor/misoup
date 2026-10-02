@@ -47,8 +47,8 @@ class CaptureCoordinator<T>(
     private val loader: CaptureImageLoader<T>,
     private val preprocess: PreprocessRunner<T>,
     private val scope: CoroutineScope,
-    /** 落库 IO 执行线程（FINDING 5：生产=Default 防主线程阻塞；测试注入测试调度器保持时序可控） */
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /** 落库 IO 执行线程（FINDING 5：生产=IO（磁盘/编码型负载）；测试注入测试调度器保持时序可控） */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val assetFactory: (T, ImageFormat) -> ImageAsset,
     private val clock: () -> String = { com.misoup.app.review.fsrs.FsrsTime.toIso(System.currentTimeMillis()) ?: "" },
     private val defaultSubject: String = CaptureDefaults.DEFAULT_SUBJECT

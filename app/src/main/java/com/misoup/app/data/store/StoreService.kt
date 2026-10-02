@@ -1,11 +1,13 @@
 package com.misoup.app.data.store
 
+import android.util.Log
 import com.misoup.app.data.index.LibraryIndex
 import com.misoup.app.data.model.MisoupConfigConst
 import com.misoup.app.data.model.MisoupMeta
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.io.FileOutputStream
 
 /**
  * StoreService：文件系统存储唯一写入口（协程 Mutex 串行，事务一致）
@@ -25,6 +27,11 @@ class StoreService(
     private val thumbService: ThumbService? = null
 ) {
     private val mutex = Mutex()
+
+    companion object {
+        /** 日志 TAG（回收区删除失败/回滚失败等 IO 异常排查用） */
+        private const val TAG = "StoreService"
+    }
 
     /**
      * 录入错题：meta + 原图 → 落库（图片先落库，识别后台异步，录入永不阻塞）
@@ -51,9 +58,11 @@ class StoreService(
                 val tmp = File(root, ".tmp-${System.currentTimeMillis()}")
                 tmp.mkdirs()
 
+                // rename 已成功的标记：其后失败需对 target 回滚（tmp 已被 rename 走）
+                var renamedToTarget = false
                 try {
-                    // 2. 写文件：meta.json / 原图.webp / 文本.md
-                    File(tmp, MisoupConfigConst.META_FILE_NAME).writeText(MetaJson.serialize(meta))
+                    // 2. 写文件：meta.json / 原图.webp / 文本.md（meta.json 写后 fsync）
+                    writeAtomic(File(tmp, MisoupConfigConst.META_FILE_NAME), MetaJson.serialize(meta))
                     val imageName = meta.images.original
                     check(encoder.encodeOriginal(originalImage, File(tmp, imageName))) { "原图编码失败" }
                     if (!text.isNullOrBlank()) {
@@ -67,6 +76,7 @@ class StoreService(
                     // 4. 原子 rename 进库
                     subjectDir.mkdirs()
                     check(tmp.renameTo(target)) { "落库失败: rename 到 $dirName" }
+                    renamedToTarget = true
 
                     // 5. 更新索引 + 缩略图（首访生成）
                     val thumbPath = thumbService?.let {
@@ -77,6 +87,13 @@ class StoreService(
                     index.indexTags(meta.id, meta.tags)   // T03：关键词搜索命中标签
                     Result.success(dirName)
                 } catch (e: Throwable) {
+                    if (renamedToTarget) {
+                        // rename 后（索引/缩略图阶段）失败：tmp 已被 rename 走，
+                        // 把条目目录移回临时区恢复原状，库内无残留（清单 #9）
+                        if (!target.renameTo(tmp)) {
+                            Log.w(TAG, "create 回滚失败，条目目录残留: ${target.absolutePath}")
+                        }
+                    }
                     tmp.deleteRecursively()   // 失败清理，库内无残留
                     Result.failure(e)
                 }
@@ -109,7 +126,7 @@ class StoreService(
                 // 优先 ATOMIC_MOVE（同卷），不支持时降级普通 REPLACE_EXISTING
                 val tmpMeta = File(entryDir, ".meta-${System.currentTimeMillis()}.tmp")
                 try {
-                    tmpMeta.writeText(MetaJson.serialize(updated))
+                    writeAtomic(tmpMeta, MetaJson.serialize(updated))
                     atomicReplace(tmpMeta, File(entryDir, MisoupConfigConst.META_FILE_NAME))
                 } catch (e: Throwable) {
                     tmpMeta.delete()
@@ -135,7 +152,11 @@ class StoreService(
 
                 val trash = File(root, ".trash-${System.currentTimeMillis()}-${entry.dirName}")
                 check(entryDir.renameTo(trash)) { "移入回收区失败" }
-                trash.deleteRecursively()
+                // 回收区删除失败不中断流程（条目已移出库，索引照常更新）；仅记录路径供排查
+                val ok = trash.deleteRecursively()
+                if (!ok) {
+                    Log.w(TAG, "回收区删除失败，目录残留: ${trash.absolutePath}")
+                }
                 index.remove(id)
                 thumbService?.delete(id)
                 Result.success(Unit)
@@ -171,7 +192,7 @@ class StoreService(
                     val updated = current.copy(subject = newSubject)
                     val tmpMeta = File(target, ".meta-${System.currentTimeMillis()}.tmp")
                     try {
-                        tmpMeta.writeText(MetaJson.serialize(updated))
+                        writeAtomic(tmpMeta, MetaJson.serialize(updated))
                         atomicReplace(tmpMeta, File(target, MisoupConfigConst.META_FILE_NAME))
                     } catch (e: Throwable) {
                         tmpMeta.delete()
@@ -344,6 +365,18 @@ class StoreService(
     }
 
     // ---------- 内部工具 ----------
+
+    /**
+     * 关键写点（meta.json）落盘：写入 + fd.sync() 强制刷到存储，防断电/进程被杀后
+     * rename 已完成而文件内容未落盘（目录与内容不一致）。rename 仍由调用方执行。
+     */
+    private fun writeAtomic(file: File, text: String) {
+        FileOutputStream(file).use { out ->
+            out.write(text.toByteArray())
+            out.flush()
+            out.fd.sync()
+        }
+    }
 
     /** 条目文本 + 标签重建倒排（upsert 清 token 后调用；文本缺失按空处理） */
     private fun reindexEntry(entryDir: File, id: String, meta: MisoupMeta) {

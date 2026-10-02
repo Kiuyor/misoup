@@ -64,6 +64,11 @@ class ReviewCardViewModelTest {
         submitter = ReviewSubmitter(store),
         store = store,
         maskStore = com.misoup.app.review.mask.MaskStore(root, index),
+        // 内存版 FSRS 参数存储（JVM 单测无 Android；返回默认参数）
+        fsrsSettings = object : com.misoup.app.settings.review.FsrsSettingsStore {
+            override fun load() = com.misoup.app.review.fsrs.Fsrs.Params()
+            override fun save(params: com.misoup.app.review.fsrs.Fsrs.Params) {}
+        },
         nowProvider = { clock }
     )
 

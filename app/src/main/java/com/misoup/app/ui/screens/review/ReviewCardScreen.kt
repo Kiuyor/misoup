@@ -61,6 +61,7 @@ import com.misoup.app.review.mask.MaskRect
 import com.misoup.app.review.mask.MaskStore
 import com.misoup.app.review.queue.QueueLoader
 import com.misoup.app.review.scheduler.ReviewSubmitter
+import com.misoup.app.settings.review.PrefsFsrsSettingsStore
 
 /**
  * 重做卡片页（T04/T05/T06 UI）：
@@ -384,7 +385,9 @@ private fun reviewCardViewModelFactory(): ViewModelProvider.Factory {
                 queueLoader = QueueLoader(store, AppGraph.index),
                 submitter = ReviewSubmitter(store),
                 store = store,
-                maskStore = MaskStore(checkNotNull(AppGraph.libraryRoot) { "库根未初始化" }, AppGraph.index)
+                maskStore = MaskStore(checkNotNull(AppGraph.libraryRoot) { "库根未初始化" }, AppGraph.index),
+                // 模块 10 T04：FSRS 调度参数接线（提交时实时读取设置页参数）
+                fsrsSettings = PrefsFsrsSettingsStore(context)
             )
         }
     }

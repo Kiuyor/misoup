@@ -11,6 +11,7 @@ import com.misoup.app.data.store.StoreService
 import com.misoup.app.data.store.ThumbService
 import com.misoup.app.data.store.WebpImageEncoder
 import com.misoup.app.pipeline.PreprocessPipeline
+import com.misoup.app.pipeline.enhance.RecognitionInput
 import com.misoup.app.recognition.coordinator.CaptureCoordinator
 import com.misoup.app.recognition.paddle.PaddleOcrEngine
 import com.misoup.app.recognition.paddle.PaddleOcrRecognizer
@@ -146,7 +147,14 @@ object AppGraph {
 /**
  * 生产预处理执行器（T08）：包装 PreprocessPipeline.run（模块 01 预处理链）。
  * 兄弟代理实现；本模块只调用，不实现。
+ *
+ * 清单 #11：对 enhanced 结果做识别输入降采样（≤1280）——本执行器只喂识别队列，
+ * 落库走 assetFactory(原图)，不受影响；拆题链路（SplitEntrySubmitter）落库用 enhanced，
+ * 故不在 Enhancer 内降采样，而在此处与拆题入队点分别处理。
  */
 object RealPreprocessRunner : com.misoup.app.recognition.coordinator.PreprocessRunner<Bitmap> {
-    override suspend fun run(bitmap: Bitmap) = PreprocessPipeline.run(bitmap)
+    override suspend fun run(bitmap: Bitmap): com.misoup.app.pipeline.PreprocessResult<Bitmap> {
+        val result = PreprocessPipeline.run(bitmap)
+        return result.copy(enhanced = RecognitionInput.downsample(result.enhanced))
+    }
 }

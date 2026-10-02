@@ -61,8 +61,17 @@ class AiSettingsViewModel(
         }
     }
 
-    /** 保存完整配置（apiKey 由仓库剥离进凭据区；限速自动收敛到 [MIN_RATE_LIMIT, MAX_RATE_LIMIT]） */
+    /**
+     * 保存完整配置（apiKey 由仓库剥离进凭据区；限速自动收敛到 [MIN_RATE_LIMIT, MAX_RATE_LIMIT]）。
+     * 安全约束（对齐 PRIVACY.md「仅允许 HTTPS」承诺）：Base URL 非 https 拒绝保存并给出原因
+     * （错误反馈模式与 WebDAV 侧 DavConfig.validate 一致）。
+     */
     fun save(config: LlmConfig) {
+        val url = config.baseUrl.trim()
+        if (url.isNotEmpty() && !url.lowercase().startsWith("https://")) {
+            _state.update { it.copy(message = "保存失败：Base URL 仅支持 HTTPS（当前为 $url）") }
+            return
+        }
         repo.save(config)
         refresh()
         _state.update { it.copy(message = "模型配置已保存") }

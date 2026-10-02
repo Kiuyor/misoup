@@ -10,14 +10,12 @@ import org.junit.Test
 class FakeDavCredentialStore : DavCredentialStore {
     val map = LinkedHashMap<String, String>()
     override fun get(key: String): String? = map[key]
-    override fun put(key: String, value: String): Boolean {
+    override fun put(key: String, value: String) {
         map[key] = value
-        return true
     }
 
-    override fun remove(key: String): Boolean {
+    override fun remove(key: String) {
         map.remove(key)
-        return true
     }
 
     override fun has(key: String): Boolean = map.containsKey(key)

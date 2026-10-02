@@ -77,6 +77,27 @@ data class EnhanceResult<out T>(
 )
 
 /**
+ * 识别输入降采样（清单 #11）：入 OCR 队列前把位图长边压到 ≤[MAX_EDGE]。
+ * 仅用于识别队列输入；落库存储用原图（原图编码走 assetFactory/裁剪图），互不影响。
+ * 已小于上限的位图原样返回（不复制）。
+ */
+object RecognitionInput {
+
+    /** 识别输入长边上限：1280px 足够 OCR 命中文字行，防超大图进队列内存/耗时膨胀 */
+    const val MAX_EDGE = 1280
+
+    /** 按比例缩放位图使长边 ≤[MAX_EDGE]；返回新位图（不改传入对象），无需缩放时原样返回 */
+    fun downsample(bitmap: Bitmap): Bitmap {
+        val longEdge = maxOf(bitmap.width, bitmap.height)
+        if (longEdge <= MAX_EDGE || longEdge == 0) return bitmap
+        val scale = MAX_EDGE.toFloat() / longEdge
+        val w = (bitmap.width * scale).toInt().coerceAtLeast(1)
+        val h = (bitmap.height * scale).toInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(bitmap, w, h, true)
+    }
+}
+
+/**
  * T05 纯逻辑（不依赖 OpenCV，JVM 可测）。
  */
 object EnhancerLogic {

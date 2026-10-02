@@ -34,8 +34,8 @@ class SyncViewModelTest {
     private class MemStore : DavCredentialStore {
         val map = HashMap<String, String>()
         override fun get(key: String): String? = map[key]
-        override fun put(key: String, value: String): Boolean { map[key] = value; return true }
-        override fun remove(key: String): Boolean { map.remove(key); return true }
+        override fun put(key: String, value: String) { map[key] = value }
+        override fun remove(key: String) { map.remove(key) }
         override fun has(key: String): Boolean = map.containsKey(key)
     }
 

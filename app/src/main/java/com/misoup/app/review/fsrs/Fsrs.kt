@@ -45,7 +45,15 @@ object Fsrs {
     /** 一天 = 86400s = 86_400_000ms */
     const val DAY_MS = 86_400_000L
 
-    /** 遗忘曲线系数（FSRS-4.5 定稿：R(t,S) = (1 + t/(9S))^-1，见 fsrs_optimizer.power_forgetting_curve） */
+    /**
+     * 已知偏差（与官方 FSRS-4.5 对齐前勿删）：
+     * 1. 遗忘曲线用 (1 + t/(9S))^-1，官方为 (1 + 19t/81S)^-0.5（两者在 t=S 处同取 0.9，其余区间有偏差）；
+     * 2. interval 在 stability 之外再乘档位系数（Hard 0.8 / Easy 1.3 / Again 0.25），
+     *    官方档位影响全部体现在 w15/w16，不再二次调整；
+     * 3. 每日统计（FsrsTime.toLocalDate）按 UTC 聚合，东八区 0-8 点复习计入前一天。
+     * 修正任一项都需用 build/ref/gen_ref.py 按新公式重新生成 FsrsTest.REFS 并同步更新
+     * FsrsTimeTest 的时区断言，否则机检测试（<5% 容差）会失败。
+     */
     private const val FORGETTING_CURVE_NINE = 9.0
 
     /** stability 钳制区间 [0.1, 36500]（fsrs_optimizer 同款） */

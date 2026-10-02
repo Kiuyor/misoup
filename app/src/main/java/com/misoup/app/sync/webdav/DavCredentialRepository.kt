@@ -10,16 +10,16 @@ import com.misoup.app.data.security.CredentialStore
  */
 interface DavCredentialStore {
     fun get(key: String): String?
-    fun put(key: String, value: String): Boolean
-    fun remove(key: String): Boolean
+    fun put(key: String, value: String)
+    fun remove(key: String)
     fun has(key: String): Boolean
 }
 
 /** 生产适配：委托 CredentialStore（EncryptedSharedPreferences） */
 class CredentialStoreBridge(private val delegate: CredentialStore) : DavCredentialStore {
     override fun get(key: String): String? = delegate.get(key)
-    override fun put(key: String, value: String): Boolean = delegate.put(key, value)
-    override fun remove(key: String): Boolean = delegate.remove(key)
+    override fun put(key: String, value: String) = delegate.put(key, value)
+    override fun remove(key: String) = delegate.remove(key)
     override fun has(key: String): Boolean = delegate.has(key)
 }
 

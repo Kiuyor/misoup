@@ -7,6 +7,8 @@ import com.misoup.app.data.store.StoreService
 import com.misoup.app.sync.webdav.DavConfig
 import com.misoup.app.sync.webdav.InsecureHttpException
 import java.io.File
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * WebDAV 同步服务（模块 09 T02/T03/T04）
@@ -28,14 +30,17 @@ class DavSyncService(
     private val statePath: String = DEFAULT_STATE_PATH
 ) {
 
+    /** 同步互斥锁：runSync 全程串行，防并发触发（手动+自动同步同时跑）导致快照/传输互踩 */
+    private val mutex = Mutex()
+
     /** T02 全量同步：镜像整库到远端（忽略上次快照；双端都有且指纹不同 → 冲突裁决） */
     suspend fun syncFull(): SyncReport = runSync(ignoreState = true)
 
     /** T03 增量双向同步：差集上传/下载/删除传播 + T04 冲突处理 */
     suspend fun syncIncremental(): SyncReport = runSync(ignoreState = false)
 
-    /** 同步主流程：配置校验（HTTPS 强制）→ 快照 → 差集 → 执行 → 回写状态 */
-    private suspend fun runSync(ignoreState: Boolean): SyncReport {
+    /** 同步主流程：配置校验（HTTPS 强制）→ 快照 → 差集 → 执行 → 回写状态（互斥串行，防并发同步） */
+    private suspend fun runSync(ignoreState: Boolean): SyncReport = mutex.withLock {
         val config = cfg()
         config.validate().getOrElse { e ->
             // T04：http 拒绝 + 明确警告（不发起任何网络请求）
@@ -135,6 +140,9 @@ class DavSyncService(
         val excluded = deletedPaths.toSet() + failedPaths
         val entries = (localEntries.keys + remoteEntries.keys)
             .filterNot { it in excluded }
+            // T04 冲突败者目录（本地 rename 遗留的 xxx.conflict-<ts>）不写入快照，
+            // 与 RemoteScanner 收录口径一致（正扫其条目路径第二段目录名）
+            .filterNot { it.substringAfter('/', "").contains(".conflict-") }
             .mapNotNull { path ->
                 val l = localEntries[path]
                 val r = remoteEntries[path]
@@ -296,6 +304,7 @@ object RemoteScanner {
             if (info.isDirectory) continue
             val parts = info.path.split('/')
             if (parts.size < 3) continue            // 不在科目/条目两级结构内（含根状态文件）
+            if (parts[1].contains(".conflict-")) continue   // T04 冲突败者目录不参与差集/收录
             val entryPath = parts.take(2).joinToString("/")
             filesByEntry.getOrPut(entryPath) { ArrayList() }.add(info)
         }
@@ -316,13 +325,19 @@ object RemoteScanner {
  */
 object LocalScanner {
 
-    /** 由索引枚举条目并计算指纹；待修复条目（needsRepair）不参与同步 */
+    /**
+     * 由索引枚举条目并计算指纹；待修复条目（needsRepair）不参与同步。
+     * 递归收集条目目录内全部非点前缀文件（与 RemoteScanner/uploadEntry 同口径：
+     * 含 变式/ 等子目录，maxMtime 取全树最大、totalSize 全树求和）
+     */
     fun entryFingerprints(index: LibraryIndex, root: File): Map<String, SyncDiff.LocalInfo> {
         val result = HashMap<String, SyncDiff.LocalInfo>()
         for (entry in index.all()) {
             if (entry.needsRepair) continue
             val dir = resolveEntryDir(root, "${entry.subject}/${entry.dirName}") ?: continue
-            val files = dir.listFiles()?.filter { it.isFile && !it.name.startsWith(".") } ?: emptyList()
+            val files = dir.walkTopDown()
+                .filter { it.isFile && !it.name.startsWith(".") }
+                .toList()
             if (files.isEmpty()) continue
             val maxMtime = files.maxOf { it.lastModified() }
             val totalSize = files.sumOf { it.length() }

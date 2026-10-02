@@ -10,6 +10,7 @@ import com.misoup.app.review.mask.MaskStore
 import com.misoup.app.review.queue.QueueLoader
 import com.misoup.app.review.queue.ReviewQueue
 import com.misoup.app.review.scheduler.ReviewSubmitter
+import com.misoup.app.settings.review.FsrsSettingsStore
 import com.misoup.app.ui.library.LibraryTextFormat
 import com.misoup.app.ui.library.QuestionText
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,8 @@ class ReviewCardViewModel(
     private val submitter: ReviewSubmitter,
     private val store: StoreService,
     private val maskStore: MaskStore,
+    /** FSRS 调度参数存储（模块 10 T04 设置页可调；提交时实时读取） */
+    private val fsrsSettings: FsrsSettingsStore,
     private val nowProvider: () -> Long = System::currentTimeMillis
 ) : ViewModel() {
 
@@ -136,7 +139,8 @@ class ReviewCardViewModel(
         if (s.submitting) return
         _uiState.update { it.copy(submitting = true, error = null) }
         viewModelScope.launch {
-            submitter.submit(id, grade, nowProvider()).fold(
+            // 模块 10 T04：提交时实时读取设置页参数（不再用 DEFAULT_PARAMS 兜底提交）
+            submitter.submit(id, grade, nowProvider(), fsrsSettings.load()).fold(
                 onSuccess = {
                     val cur = _uiState.value
                     val nextIndex = cur.currentIndex + 1
@@ -161,7 +165,7 @@ class ReviewCardViewModel(
     fun effectiveMask(): MaskRect = _uiState.value.mask.effective()
 
     companion object {
-        /** 默认 FSRS 参数（settings 可调，UI 层暂用初始值） */
+        /** 默认 FSRS 参数（保留作参考初值；提交默认值已改为设置页实时读取，见 [submitGrade]） */
         val DEFAULT_PARAMS = Fsrs.Params()
     }
 }

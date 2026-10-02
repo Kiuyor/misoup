@@ -24,19 +24,19 @@ import androidx.security.crypto.MasterKey
  */
 class CredentialStore private constructor(private val prefs: SharedPreferences) {
 
-    /** 写入凭据（同步提交，落盘成功返回 true；key 非法直接抛 IllegalArgumentException） */
-    fun put(key: String, value: String): Boolean {
+    /** 写入凭据（apply 异步落盘；key 非法直接抛 IllegalArgumentException） */
+    fun put(key: String, value: String) {
         require(CredentialKeys.isValid(key)) { "凭据 key 必须以 '${CredentialKeys.PREFIX}' 开头: $key" }
-        return prefs.edit().putString(key, value).commit()
+        prefs.edit().putString(key, value).apply()
     }
 
     /** 读取凭据；不存在返回 null */
     fun get(key: String): String? = prefs.getString(key, null)
 
-    /** 删除凭据（同步提交；key 非法直接抛 IllegalArgumentException） */
-    fun remove(key: String): Boolean {
+    /** 删除凭据（apply 异步落盘；key 非法直接抛 IllegalArgumentException） */
+    fun remove(key: String) {
         require(CredentialKeys.isValid(key)) { "凭据 key 必须以 '${CredentialKeys.PREFIX}' 开头: $key" }
-        return prefs.edit().remove(key).commit()
+        prefs.edit().remove(key).apply()
     }
 
     /** 是否存在该凭据 */

@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.misoup.app.AppGraph
 import com.misoup.app.data.store.StoreService
+import com.misoup.app.pipeline.enhance.RecognitionInput
 import com.misoup.app.recognition.coordinator.CaptureSource
 import com.misoup.app.recognition.paddle.PaddleOcrEngine
 import com.misoup.app.splitting.candidates.TextLine
@@ -132,7 +133,10 @@ fun SplitPageEntryScreen(
                         SplitEntrySubmitter(
                             store = store,
                             // FINDING 3：拆题入库后裁剪图入队识别（识别队列在 CaptureCoordinator 内）
-                            onRecognize = { id, bmp -> AppGraph.captureCoordinator?.enqueueRecognition(id, bmp) }
+                            // 清单 #11：入队前降采样（落库在 submitAll 内已用原 enhanced 完成，互不影响）
+                            onRecognize = { id, bmp ->
+                                AppGraph.captureCoordinator?.enqueueRecognition(id, RecognitionInput.downsample(bmp))
+                            }
                         ).submitAll(bitmap!!, boxes)
                     },
                 )
